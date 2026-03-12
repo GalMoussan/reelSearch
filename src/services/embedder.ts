@@ -2,18 +2,18 @@ import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
 const EMBEDDING_MODEL = "text-embedding-3-small"
+
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!text.trim()) {
     throw new Error("Cannot generate embedding for empty text")
   }
 
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: EMBEDDING_MODEL,
     input: text,
   })

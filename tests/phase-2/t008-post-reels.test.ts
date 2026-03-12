@@ -1,43 +1,131 @@
-import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// MSW server for mocking external calls during API route testing
-const server = setupServer()
+// Mock all external dependencies BEFORE importing the route
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    reel: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+  },
+}))
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
-afterEach(() => server.resetHandlers())
-afterAll(() => server.close())
+vi.mock('@/lib/queue', () => ({
+  addReelJob: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/auth-utils', () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    user: { id: 'user-123', name: 'Test', email: 'test@test.com' },
+  }),
+}))
+
+vi.mock('@/lib/auth', () => ({
+  authOptions: {
+    providers: [],
+  },
+}))
+
+vi.mock('next-auth', () => ({
+  getServerSession: vi.fn().mockResolvedValue({
+    user: { id: 'user-123', name: 'Test', email: 'test@test.com' },
+  }),
+}))
+
+import { POST } from '@/app/api/reels/route'
+import { prisma } from '@/lib/prisma'
+import { addReelJob } from '@/lib/queue'
+import { requireAuth } from '@/lib/auth-utils'
+import { NextRequest } from 'next/server'
+
+function makeRequest(body: Record<string, unknown>): NextRequest {
+  return new NextRequest('http://localhost/api/reels', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
 
 describe('T008 — POST /api/reels Endpoint', () => {
-  it('should return 201 with a valid Instagram/TikTok URL', async () => {
-    // TODO: Import and invoke the API route handler
-    // POST /api/reels with { url: 'https://www.instagram.com/reel/abc123/' }
-    // Expect status 201 and response body to contain reel id
-    expect(true).toBe(false) // TODO: implement
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: 'user-123', name: 'Test', email: 'test@test.com' },
+      expires: '2099-01-01',
+    })
+    vi.mocked(prisma.reel.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.reel.create).mockResolvedValue({
+      id: 'reel-abc',
+      url: 'https://www.instagram.com/reel/abc123/',
+      status: 'PENDING',
+      addedById: 'user-123',
+      title: null,
+      summary: null,
+      transcript: null,
+      language: null,
+      thumbnailUrl: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any)
+  })
+
+  it('should return 201 with a valid Instagram URL', async () => {
+    const req = makeRequest({ url: 'https://www.instagram.com/reel/abc123/' })
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(body.reel).toBeDefined()
+    expect(body.reel.id).toBe('reel-abc')
   })
 
   it('should return 400 with an invalid URL', async () => {
-    // TODO: POST /api/reels with { url: 'not-a-url' }
-    // Expect status 400 and error message
-    expect(true).toBe(false) // TODO: implement
+    const req = makeRequest({ url: 'not-a-url' })
+    const res = await POST(req)
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBeDefined()
   })
 
   it('should handle duplicate URLs gracefully', async () => {
-    // TODO: POST /api/reels twice with the same URL
-    // Second request should return 409 or return existing reel
-    expect(true).toBe(false) // TODO: implement
+    vi.mocked(prisma.reel.findUnique).mockResolvedValue({
+      id: 'existing-reel',
+      url: 'https://www.instagram.com/reel/abc123/',
+      status: 'DONE',
+    } as any)
+
+    const req = makeRequest({ url: 'https://www.instagram.com/reel/abc123/' })
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.reel.id).toBe('existing-reel')
+    // Should NOT create a new reel
+    expect(prisma.reel.create).not.toHaveBeenCalled()
   })
 
   it('should create a reel record with PENDING status', async () => {
-    // TODO: POST /api/reels, then query DB for the reel
-    // Expect reel.status === 'PENDING'
-    expect(true).toBe(false) // TODO: implement
+    const req = makeRequest({ url: 'https://www.instagram.com/reel/abc123/' })
+    await POST(req)
+
+    expect(prisma.reel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'PENDING',
+          addedById: 'user-123',
+        }),
+      })
+    )
   })
 
   it('should enqueue a BullMQ processing job', async () => {
-    // TODO: Mock queue.add, POST /api/reels
-    // Expect queue.add to have been called with reel id
-    expect(true).toBe(false) // TODO: implement
+    const req = makeRequest({ url: 'https://www.instagram.com/reel/abc123/' })
+    await POST(req)
+
+    expect(addReelJob).toHaveBeenCalledWith('reel-abc')
   })
 })

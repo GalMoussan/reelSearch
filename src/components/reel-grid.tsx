@@ -10,9 +10,11 @@ import { cn } from "@/lib/utils"
 interface ReelGridProps {
   tags?: string[]
   q?: string
+  onReelClick?: (reelId: string) => void
+  onClearFilters?: () => void
 }
 
-export function ReelGrid({ tags, q }: ReelGridProps) {
+export function ReelGrid({ tags, q, onReelClick, onClearFilters }: ReelGridProps) {
   const {
     data,
     isLoading,
@@ -47,8 +49,7 @@ export function ReelGrid({ tags, q }: ReelGridProps) {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   function handleReelClick(reelId: string) {
-    // T031 will wire up the detail modal
-    console.log("Reel clicked:", reelId)
+    onReelClick?.(reelId)
   }
 
   if (isLoading) {
@@ -79,7 +80,7 @@ export function ReelGrid({ tags, q }: ReelGridProps) {
     return (
       <EmptyState
         variant={hasFilters ? "filtered" : "initial"}
-        onClearFilters={hasFilters ? () => window.location.assign("/") : undefined}
+        onClearFilters={hasFilters ? onClearFilters : undefined}
       />
     )
   }

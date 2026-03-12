@@ -41,4 +41,18 @@ function validateEnv(): Env {
   return result.data
 }
 
-export const env = validateEnv()
+let _env: Env | undefined
+
+export function getEnv(): Env {
+  if (!_env) {
+    _env = validateEnv()
+  }
+  return _env
+}
+
+// Lazy proxy — validates on first property access, not at import time
+export const env: Env = new Proxy({} as Env, {
+  get(_, prop: string) {
+    return getEnv()[prop as keyof Env]
+  },
+})

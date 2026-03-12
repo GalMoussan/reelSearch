@@ -1,9 +1,9 @@
 import { createReadStream } from "fs"
 import OpenAI from "openai"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 export type TranscriptionResult = {
   text: string
@@ -32,7 +32,7 @@ export async function transcribe(
   try {
     const fileStream = createReadStream(audioPath)
 
-    const response = await openai.audio.transcriptions.create({
+    const response = await getOpenAI().audio.transcriptions.create({
       model: "whisper-1",
       file: fileStream,
       response_format: "verbose_json",

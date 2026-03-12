@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
 
-const anthropic = new Anthropic()
+function getAnthropic() {
+  return new Anthropic()
+}
 
 const analysisSchema = z.object({
   tags: z.array(z.string()).min(20),
@@ -74,7 +76,7 @@ async function callWithRetry(
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const response = await anthropic.messages.create({
+      const response = await getAnthropic().messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
         system: SYSTEM_PROMPT,

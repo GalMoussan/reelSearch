@@ -18,11 +18,11 @@ export function TagFilterBar({ selectedTags, onTagsChange }: TagFilterBarProps) 
     return null
   }
 
-  const handleTagClick = (tagId: string) => {
-    if (selectedTags.includes(tagId)) {
-      onTagsChange(selectedTags.filter((id) => id !== tagId))
+  const handleTagClick = (tagName: string) => {
+    if (selectedTags.includes(tagName)) {
+      onTagsChange(selectedTags.filter((name) => name !== tagName))
     } else {
-      onTagsChange([...selectedTags, tagId])
+      onTagsChange([...selectedTags, tagName])
     }
   }
 
@@ -44,11 +44,11 @@ export function TagFilterBar({ selectedTags, onTagsChange }: TagFilterBarProps) 
             ))
           : // Actual tag badges
             tags.map((tag) => {
-              const isSelected = selectedTags.includes(tag.id)
+              const isSelected = selectedTags.includes(tag.name)
               return (
                 <button
                   key={tag.id}
-                  onClick={() => handleTagClick(tag.id)}
+                  onClick={() => handleTagClick(tag.name)}
                   className="flex-shrink-0 focus:outline-none"
                 >
                   <Badge

@@ -1,18 +1,32 @@
 import { describe, it, expect } from 'vitest'
+import { existsSync, readFileSync } from 'fs'
+import { resolve } from 'path'
+
+const ROOT = resolve(__dirname, '../..')
 
 describe('T043 — README Documentation', () => {
-  it('should contain setup instructions in README.md', () => {
-    // TODO: read README.md and verify it contains setup/installation section
-    expect(true).toBe(false)
+  it('should have README.md at project root', () => {
+    const readmePath = resolve(ROOT, 'README.md')
+    expect(existsSync(readmePath)).toBe(true)
   })
 
-  it('should list prerequisites in README.md', () => {
-    // TODO: read README.md and verify prerequisites section (Node.js, pnpm, etc.)
-    expect(true).toBe(false)
+  it('should contain setup instructions', () => {
+    const content = readFileSync(resolve(ROOT, 'README.md'), 'utf-8')
+    expect(content).toMatch(/Quick\s+Start|Getting\s+Started/i)
   })
 
-  it('should document environment variables in README.md', () => {
-    // TODO: read README.md and verify environment variables section exists
-    expect(true).toBe(false)
+  it('should list Node.js as a prerequisite', () => {
+    const content = readFileSync(resolve(ROOT, 'README.md'), 'utf-8')
+    expect(content).toMatch(/Node\.?js/i)
+  })
+
+  it('should list pnpm as a prerequisite', () => {
+    const content = readFileSync(resolve(ROOT, 'README.md'), 'utf-8')
+    expect(content).toMatch(/pnpm/i)
+  })
+
+  it('should document environment variables', () => {
+    const content = readFileSync(resolve(ROOT, 'README.md'), 'utf-8')
+    expect(content).toMatch(/environment\s+variables|\.env/i)
   })
 })

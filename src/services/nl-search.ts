@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma"
 import { fullTextSearch, semanticSearch } from "@/services/search"
 import type { SearchResult, SemanticSearchResult } from "@/services/search"
 
-const anthropic = new Anthropic()
+function getAnthropic() {
+  return new Anthropic()
+}
 
 export interface SearchPlan {
   keywords: string[]
@@ -31,7 +33,7 @@ tags: normalized tag names (lowercase, no spaces) that might match existing tags
 semanticQuery: a clean sentence capturing the user's intent for embedding-based search`
 
 async function decompose(query: string): Promise<SearchPlan> {
-  const message = await anthropic.messages.create({
+  const message = await getAnthropic().messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 512,
     system: SYSTEM_PROMPT,

@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 import { reelUrlSchema } from "@/lib/validators"
 
-export function ReelForm() {
+interface ReelFormProps {
+  onSubmitted?: (reelId: string) => void
+}
+
+export function ReelForm({ onSubmitted }: ReelFormProps) {
   const [url, setUrl] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -32,8 +36,10 @@ export function ReelForm() {
       })
 
       if (response.status === 201) {
+        const body = await response.json().catch(() => null)
         toast("Reel submitted! Processing started.", "success")
         setUrl("")
+        if (body?.data?.id) onSubmitted?.(body.data.id)
         return
       }
 

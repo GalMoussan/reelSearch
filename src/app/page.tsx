@@ -1,24 +1,109 @@
+"use client"
+
+import { useState, useCallback } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { ReelForm } from "@/components/reel-form"
 import { ReelGrid } from "@/components/reel-grid"
+import { SearchBar } from "@/components/search-bar"
+import { TagFilterBar } from "@/components/tag-filter-bar"
+import { NLSearch } from "@/components/nl-search"
+import { ProcessingStatus } from "@/components/processing-status"
+import { ReelDetailModal } from "@/components/reel-detail-modal"
 
 export default function Home() {
+  // Filter state
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isNLMode, setIsNLMode] = useState(false)
+
+  // Processing status after submission
+  const [lastSubmittedReelId, setLastSubmittedReelId] = useState<string | null>(null)
+
+  // Detail modal
+  const [selectedReelId, setSelectedReelId] = useState<string | null>(null)
+
+  const queryClient = useQueryClient()
+
+  const handleReelSubmitted = useCallback((reelId: string) => {
+    setLastSubmittedReelId(reelId)
+    // Invalidate reels list to show the new reel
+    queryClient.invalidateQueries({ queryKey: ["reels"] })
+  }, [queryClient])
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value)
+  }, [])
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    setSelectedTags(tags)
+  }, [])
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedTags([])
+    setSearchQuery("")
+  }, [])
+
   return (
-    <div className="flex flex-col items-center gap-8 pt-16 pb-24">
-      <section className="flex flex-col items-center gap-4 text-center max-w-2xl">
+    <div className="flex flex-col gap-8 pb-24">
+      {/* Hero + Submission */}
+      <section className="flex flex-col items-center gap-4 pt-16 text-center">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Save &amp; Search Instagram Reels
         </h1>
-        <p className="text-lg text-muted-foreground">
+        <p className="max-w-2xl text-lg text-muted-foreground">
           Paste a reel URL to save it. We&apos;ll transcribe, summarize, and make
           it searchable so you can find it later.
         </p>
+        <ReelForm onSubmitted={handleReelSubmitted} />
+        <ProcessingStatus reelId={lastSubmittedReelId} />
       </section>
 
-      <ReelForm />
+      {/* Search & Filters */}
+      <section className="w-full space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {isNLMode ? (
+            <div className="flex-1">
+              <NLSearch onModeChange={setIsNLMode} />
+            </div>
+          ) : (
+            <>
+              <div className="flex-1">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="Search reels..."
+                />
+              </div>
+              <NLSearch onModeChange={setIsNLMode} />
+            </>
+          )}
+        </div>
 
-      <section className="w-full max-w-7xl px-4">
-        <ReelGrid />
+        {!isNLMode && (
+          <TagFilterBar
+            selectedTags={selectedTags}
+            onTagsChange={handleTagsChange}
+          />
+        )}
       </section>
+
+      {/* Reel Grid */}
+      {!isNLMode && (
+        <section className="w-full">
+          <ReelGrid
+            tags={selectedTags.length > 0 ? selectedTags : undefined}
+            q={searchQuery || undefined}
+            onReelClick={setSelectedReelId}
+            onClearFilters={handleClearFilters}
+          />
+        </section>
+      )}
+
+      {/* Detail Modal */}
+      <ReelDetailModal
+        reelId={selectedReelId}
+        onClose={() => setSelectedReelId(null)}
+      />
     </div>
   )
 }

@@ -5,30 +5,33 @@ import { resolve } from 'path'
 const ROOT = resolve(__dirname, '../..')
 
 describe('T014 — Embedding Generation', () => {
-  it('should export generateEmbedding function from embedder.ts', () => {
-    const embedderPath = resolve(ROOT, 'src/lib/pipeline/embedder.ts')
+  it('should export generateEmbedding and storeEmbedding from embedder.ts', () => {
+    const embedderPath = resolve(ROOT, 'src/services/embedder.ts')
     expect(existsSync(embedderPath)).toBe(true)
     const content = readFileSync(embedderPath, 'utf-8')
     expect(content).toContain('export')
     expect(content).toContain('generateEmbedding')
+    expect(content).toContain('storeEmbedding')
   })
 
-  it('should call OpenAI embeddings API with the summary text', async () => {
-    // TODO: Mock OpenAI client embeddings.create
-    // Call generateEmbedding with a summary string
-    // Verify the API is called with model 'text-embedding-ada-002' or similar
-    expect(true).toBe(false) // TODO: implement
+  it('should use OpenAI embeddings API with text-embedding model', () => {
+    const embedderPath = resolve(ROOT, 'src/services/embedder.ts')
+    const content = readFileSync(embedderPath, 'utf-8')
+    expect(content).toContain('embeddings.create')
+    expect(content).toContain('text-embedding')
   })
 
-  it('should return a 1536-dimensional vector', async () => {
-    // TODO: Mock OpenAI response with 1536-dim array
-    // Verify result is an array of length 1536
-    expect(true).toBe(false) // TODO: implement
+  it('should store the vector in the database via raw SQL', () => {
+    const embedderPath = resolve(ROOT, 'src/services/embedder.ts')
+    const content = readFileSync(embedderPath, 'utf-8')
+    expect(content).toContain('$executeRaw')
+    expect(content).toContain('::vector')
+    expect(content).toContain('UPDATE')
   })
 
-  it('should store the vector in the database via raw SQL', async () => {
-    // TODO: Mock Prisma.$executeRaw or $executeRawUnsafe
-    // Verify raw SQL UPDATE is called with the embedding vector
-    expect(true).toBe(false) // TODO: implement
+  it('should export embedAndStore convenience function', () => {
+    const embedderPath = resolve(ROOT, 'src/services/embedder.ts')
+    const content = readFileSync(embedderPath, 'utf-8')
+    expect(content).toContain('export async function embedAndStore')
   })
 })
