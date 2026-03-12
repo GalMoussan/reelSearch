@@ -173,7 +173,22 @@ function ReelContent({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm text-muted-foreground">
         <div className="flex flex-col gap-1">
           {reel.addedBy?.name && (
-            <span>Added by {reel.addedBy.name}</span>
+            <span className="flex items-center gap-2">
+              {reel.addedBy.image ? (
+                <Image
+                  src={reel.addedBy.image}
+                  alt={reel.addedBy.name}
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                  {reel.addedBy.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span>Added by {reel.addedBy.name}</span>
+            </span>
           )}
           <span>{formatDate(reel.createdAt)}</span>
         </div>

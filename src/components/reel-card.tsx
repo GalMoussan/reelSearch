@@ -140,8 +140,21 @@ export function ReelCard({ reel, onClick }: ReelCardProps) {
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>{formatRelativeDate(reel.createdAt)}</span>
           {reel.addedBy?.name && (
-            <span className="truncate max-w-[50%] text-right">
-              by {reel.addedBy.name}
+            <span className="flex items-center gap-1.5 truncate max-w-[50%]">
+              {reel.addedBy.image ? (
+                <Image
+                  src={reel.addedBy.image}
+                  alt={reel.addedBy.name}
+                  width={24}
+                  height={24}
+                  className="rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                  {reel.addedBy.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="truncate">{reel.addedBy.name}</span>
             </span>
           )}
         </div>

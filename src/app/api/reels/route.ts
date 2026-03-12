@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { Prisma } from "@prisma/client"
 
+import { authOptions } from "@/lib/auth"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { addReelJob } from "@/lib/queue"
@@ -8,6 +10,11 @@ import { reelUrlSchema } from "@/lib/validators"
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = request.nextUrl
 
     const pageParam = searchParams.get("page") ?? "1"
@@ -64,7 +71,10 @@ export async function GET(request: NextRequest) {
     const [reels, total] = await Promise.all([
       prisma.reel.findMany({
         where,
-        include: { tags: true },
+        include: {
+          tags: true,
+          addedBy: { select: { id: true, name: true, image: true } },
+        },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
