@@ -6,7 +6,7 @@ export const reelQueue = new Queue("reel-processing", {
     maxRetriesPerRequest: null,
   },
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 2,
     backoff: {
       type: "exponential",
       delay: 2000,

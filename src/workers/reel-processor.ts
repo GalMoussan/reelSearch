@@ -1,4 +1,12 @@
 import { Worker, Job } from "bullmq"
+import { prisma } from "../lib/prisma"
+import { downloadReel } from "../services/downloader"
+import { transcribe } from "../services/transcriber"
+import { extractFrames } from "../services/frame-sampler"
+import { analyzeReel } from "../services/analyzer"
+import { normalizeTags } from "../services/tag-normalizer"
+import { embedAndStore } from "../services/embedder"
+import { cleanupTempFiles } from "../services/cleanup"
 
 const connection = {
   url: process.env.REDIS_URL!,
@@ -11,19 +19,77 @@ interface ReelJobData {
 
 async function processReel(job: Job<ReelJobData>) {
   const { reelId } = job.data
-  console.log(`[Worker] Processing reel: ${reelId}`)
+  const startTime = Date.now()
 
-  // Pipeline steps will be implemented in Phase 2:
-  // 1. Download video (T009)
-  // 2. Extract audio (T009)
-  // 3. Transcribe (T010)
-  // 4. Extract frames (T011)
-  // 5. Analyze with Claude Vision (T012)
-  // 6. Normalize tags (T013)
-  // 7. Generate embeddings (T014)
-  // 8. Cleanup temp files (T015)
+  try {
+    // 1. Get reel from DB and update to PROCESSING
+    const reel = await prisma.reel.update({
+      where: { id: reelId },
+      data: { status: "PROCESSING" },
+    })
 
-  console.log(`[Worker] Reel ${reelId} processed (placeholder)`)
+    console.log(`[Worker] Processing reel: ${reelId} (${reel.url})`)
+
+    // 2. Download video, audio, thumbnail
+    const { videoPath, audioPath } = await downloadReel(reelId, reel.url)
+    await job.updateProgress(20)
+
+    // 3. Transcribe audio and extract frames IN PARALLEL
+    const [transcription, frames] = await Promise.all([
+      transcribe(audioPath),
+      extractFrames(videoPath),
+    ])
+    await job.updateProgress(50)
+
+    // 4. Analyze with Claude Vision
+    const analysis = await analyzeReel(frames, transcription.text)
+    await job.updateProgress(70)
+
+    // 5. Normalize tags + store metadata, and generate embeddings IN PARALLEL
+    await Promise.all([
+      normalizeTags(reelId, analysis.tags, {
+        title: analysis.title,
+        summary: analysis.summary,
+        transcript: transcription.text,
+        language: analysis.language,
+      }),
+      embedAndStore(reelId, analysis.summary),
+    ])
+    await job.updateProgress(90)
+
+    // 6. Cleanup and mark done
+    await cleanupTempFiles(reelId)
+    await prisma.reel.update({
+      where: { id: reelId },
+      data: { status: "DONE" },
+    })
+    await job.updateProgress(100)
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[Worker] Reel ${reelId} completed in ${duration}s`)
+  } catch (error) {
+    // Mark reel as FAILED with error message
+    const errorMessage =
+      error instanceof Error ? error.message : String(error)
+    console.error(`[Worker] Reel ${reelId} failed:`, errorMessage)
+
+    await prisma.reel
+      .update({
+        where: { id: reelId },
+        data: {
+          status: "FAILED",
+          errorMessage,
+        },
+      })
+      .catch((dbErr) => {
+        console.error(`[Worker] Failed to update reel status:`, dbErr)
+      })
+
+    // Cleanup temp files even on failure
+    await cleanupTempFiles(reelId)
+
+    throw error // Re-throw so BullMQ handles retries
+  }
 }
 
 const worker = new Worker("reel-processing", processReel, {
@@ -43,7 +109,6 @@ worker.on("error", (err) => {
   console.error("[Worker] Error:", err.message)
 })
 
-// Graceful shutdown
 async function shutdown() {
   console.log("[Worker] Shutting down...")
   await worker.close()
