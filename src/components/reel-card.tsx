@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
-import { Film } from "lucide-react"
+import { Film, RotateCcw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 interface ReelCardProps {
   reel: {
@@ -14,6 +16,7 @@ interface ReelCardProps {
     summary: string | null
     thumbnailUrl: string | null
     status: string
+    errorMessage?: string | null
     createdAt: string
     tags: Array<{ id: string; name: string }>
     addedBy?: { name: string | null; image: string | null }
@@ -53,9 +56,11 @@ const STATUS_STYLES: Record<string, string> = {
 const MAX_VISIBLE_TAGS = 5
 
 export function ReelCard({ reel, onClick }: ReelCardProps) {
+  const [isRetrying, setIsRetrying] = useState(false)
   const visibleTags = reel.tags.slice(0, MAX_VISIBLE_TAGS)
   const remainingCount = reel.tags.length - MAX_VISIBLE_TAGS
   const showStatusBadge = reel.status !== "DONE"
+  const isFailed = reel.status === "FAILED"
 
   function handleClick() {
     onClick?.(reel.id)
@@ -68,11 +73,27 @@ export function ReelCard({ reel, onClick }: ReelCardProps) {
     }
   }
 
+  async function handleRetry(e: React.MouseEvent) {
+    e.stopPropagation()
+    setIsRetrying(true)
+    try {
+      const res = await fetch(`/api/reels/${reel.id}/retry`, { method: "POST" })
+      if (!res.ok) {
+        console.error("Retry failed:", await res.text())
+      }
+    } catch (err) {
+      console.error("Retry error:", err)
+    } finally {
+      setIsRetrying(false)
+    }
+  }
+
   return (
     <Card
       className={cn(
         "overflow-hidden transition-shadow hover:shadow-lg",
-        onClick && "cursor-pointer"
+        onClick && "cursor-pointer",
+        isFailed && "border-destructive/50 bg-destructive/5"
       )}
       tabIndex={0}
       role="button"
@@ -108,6 +129,28 @@ export function ReelCard({ reel, onClick }: ReelCardProps) {
       </div>
 
       <CardContent className="p-4">
+        {/* Failed state: retry button + error message */}
+        {isFailed && (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span
+              className="truncate text-xs text-destructive"
+              title={reel.errorMessage ?? "Processing failed"}
+            >
+              {reel.errorMessage ?? "Processing failed"}
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-6 shrink-0 px-2 text-xs"
+              onClick={handleRetry}
+              disabled={isRetrying}
+            >
+              <RotateCcw className={cn("mr-1 h-3 w-3", isRetrying && "animate-spin")} />
+              {isRetrying ? "Retrying..." : "Retry"}
+            </Button>
+          </div>
+        )}
+
         {/* Title */}
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
           {reel.title ?? "Untitled Reel"}

@@ -3,28 +3,13 @@
 import { useEffect, useRef } from "react"
 import { useReels } from "@/hooks/use-reels"
 import { ReelCard } from "@/components/reel-card"
+import ReelCardSkeleton from "@/components/reel-card-skeleton"
+import { EmptyState } from "@/components/empty-state"
 import { cn } from "@/lib/utils"
 
 interface ReelGridProps {
   tags?: string[]
   q?: string
-}
-
-function SkeletonCard() {
-  return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="aspect-video w-full animate-pulse bg-muted" />
-      <div className="space-y-2 p-4">
-        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-        <div className="h-3 w-full animate-pulse rounded bg-muted" />
-        <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
-        <div className="mt-2 flex gap-1">
-          <div className="h-4 w-12 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-10 animate-pulse rounded bg-muted" />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function ReelGrid({ tags, q }: ReelGridProps) {
@@ -70,7 +55,7 @@ export function ReelGrid({ tags, q }: ReelGridProps) {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <SkeletonCard key={i} />
+          <ReelCardSkeleton key={i} />
         ))}
       </div>
     )
@@ -88,11 +73,14 @@ export function ReelGrid({ tags, q }: ReelGridProps) {
 
   const allReels = data?.pages.flatMap((page) => page.data) ?? []
 
+  const hasFilters = Boolean(tags?.length || q)
+
   if (allReels.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        No reels found. Submit a reel URL above to get started.
-      </div>
+      <EmptyState
+        variant={hasFilters ? "filtered" : "initial"}
+        onClearFilters={hasFilters ? () => window.location.assign("/") : undefined}
+      />
     )
   }
 
@@ -112,9 +100,11 @@ export function ReelGrid({ tags, q }: ReelGridProps) {
       <div ref={sentinelRef} className="h-1" />
 
       {isFetchingNextPage && (
-        <p className="py-4 text-center text-sm text-muted-foreground">
-          Loading more...
-        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <ReelCardSkeleton key={`next-${i}`} />
+          ))}
+        </div>
       )}
     </div>
   )

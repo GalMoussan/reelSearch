@@ -20,6 +20,7 @@ interface Reel {
   summary: string | null
   thumbnailUrl: string | null
   status: string
+  errorMessage?: string | null
   createdAt: string
   tags: ReelTag[]
   addedBy?: { name: string | null; image: string | null }
