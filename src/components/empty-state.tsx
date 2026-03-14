@@ -2,7 +2,8 @@ import { Film, Link2, Sparkles, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface EmptyStateProps {
-  variant?: "initial" | "filtered"
+  variant?: "initial" | "filtered" | "search"
+  searchQuery?: string
   onClearFilters?: () => void
 }
 
@@ -24,7 +25,26 @@ const STEPS = [
   },
 ] as const
 
-export function EmptyState({ variant = "initial", onClearFilters }: EmptyStateProps) {
+export function EmptyState({ variant = "initial", searchQuery, onClearFilters }: EmptyStateProps) {
+  if (variant === "search") {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Search className="h-12 w-12 text-muted-foreground/50" />
+        <h2 className="mt-4 text-lg font-semibold">
+          No results{searchQuery ? ` for "${searchQuery}"` : ""}
+        </h2>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Try different keywords or use AI Search for natural language queries.
+        </p>
+        {onClearFilters && (
+          <Button variant="outline" className="mt-4" onClick={onClearFilters}>
+            Clear search
+          </Button>
+        )}
+      </div>
+    )
+  }
+
   if (variant === "filtered") {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">

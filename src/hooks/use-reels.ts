@@ -34,19 +34,27 @@ interface ReelsResponse {
 export interface UseReelsOptions {
   tags?: string[]
   q?: string
+  language?: string
+  dateFrom?: string
+  dateTo?: string
+  status?: string
 }
 
 export function useReels(options: UseReelsOptions = {}) {
-  const { tags, q } = options
+  const { tags, q, language, dateFrom, dateTo, status } = options
 
   return useInfiniteQuery<ReelsResponse>({
-    queryKey: ["reels", { tags, q }],
+    queryKey: ["reels", { tags, q, language, dateFrom, dateTo, status }],
     queryFn: async ({ pageParam = 1 }) => {
       const params = new URLSearchParams()
       params.set("page", String(pageParam))
       params.set("limit", "20")
       if (tags?.length) params.set("tags", tags.join(","))
       if (q) params.set("q", q)
+      if (language) params.set("language", language)
+      if (dateFrom) params.set("dateFrom", dateFrom)
+      if (dateTo) params.set("dateTo", dateTo)
+      if (status) params.set("status", status)
 
       const res = await fetch(`/api/reels?${params}`)
       if (!res.ok) throw new Error("Failed to fetch reels")

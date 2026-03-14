@@ -6,6 +6,7 @@ import { ReelForm } from "@/components/reel-form"
 import { ReelGrid } from "@/components/reel-grid"
 import { SearchBar } from "@/components/search-bar"
 import { TagFilterBar } from "@/components/tag-filter-bar"
+import { FilterBar, type FilterBarValues } from "@/components/filter-bar"
 import { NLSearch } from "@/components/nl-search"
 import { ProcessingStatus } from "@/components/processing-status"
 import { ReelDetailModal } from "@/components/reel-detail-modal"
@@ -14,6 +15,7 @@ export default function Home() {
   // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [filters, setFilters] = useState<FilterBarValues>({})
   const [isNLMode, setIsNLMode] = useState(false)
 
   // Processing status after submission
@@ -26,7 +28,6 @@ export default function Home() {
 
   const handleReelSubmitted = useCallback((reelId: string) => {
     setLastSubmittedReelId(reelId)
-    // Invalidate reels list to show the new reel
     queryClient.invalidateQueries({ queryKey: ["reels"] })
   }, [queryClient])
 
@@ -38,9 +39,14 @@ export default function Home() {
     setSelectedTags(tags)
   }, [])
 
+  const handleFiltersChange = useCallback((values: FilterBarValues) => {
+    setFilters(values)
+  }, [])
+
   const handleClearFilters = useCallback(() => {
     setSelectedTags([])
     setSearchQuery("")
+    setFilters({})
   }, [])
 
   return (
@@ -71,6 +77,11 @@ export default function Home() {
                 <SearchBar
                   value={searchQuery}
                   onChange={handleSearchChange}
+                  onTagSelect={(tag) => {
+                    if (!selectedTags.includes(tag)) {
+                      setSelectedTags([...selectedTags, tag])
+                    }
+                  }}
                   placeholder="Search reels..."
                 />
               </div>
@@ -80,10 +91,13 @@ export default function Home() {
         </div>
 
         {!isNLMode && (
-          <TagFilterBar
-            selectedTags={selectedTags}
-            onTagsChange={handleTagsChange}
-          />
+          <>
+            <TagFilterBar
+              selectedTags={selectedTags}
+              onTagsChange={handleTagsChange}
+            />
+            <FilterBar values={filters} onChange={handleFiltersChange} />
+          </>
         )}
       </section>
 
@@ -93,6 +107,10 @@ export default function Home() {
           <ReelGrid
             tags={selectedTags.length > 0 ? selectedTags : undefined}
             q={searchQuery || undefined}
+            language={filters.language}
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            status={filters.status}
             onReelClick={setSelectedReelId}
             onClearFilters={handleClearFilters}
           />

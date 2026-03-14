@@ -32,14 +32,29 @@ export async function storeEmbedding(
   )
 }
 
+export function isEmbeddingEnabled(): boolean {
+  return Boolean(
+    process.env.OPENAI_API_KEY &&
+      process.env.OPENAI_API_KEY !== "sk-your-openai-key",
+  )
+}
+
 export async function embedAndStore(
   reelId: string,
-  summaryText: string
+  text: string
 ): Promise<void> {
-  if (!summaryText?.trim()) {
+  if (!isEmbeddingEnabled()) {
+    console.warn("[Embedder] OPENAI_API_KEY not set, skipping embedding generation")
     return
   }
 
-  const embedding = await generateEmbedding(summaryText)
+  if (!text?.trim()) {
+    return
+  }
+
+  // Truncate to ~8000 chars to stay within embedding model token limits
+  const truncated = text.slice(0, 8000)
+
+  const embedding = await generateEmbedding(truncated)
   await storeEmbedding(reelId, embedding)
 }

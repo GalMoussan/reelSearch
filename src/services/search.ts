@@ -58,11 +58,11 @@ export async function fullTextSearch(
         r."summary",
         r."thumbnailUrl",
         ts_rank(
-          to_tsvector('english', COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
+          to_tsvector('english', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
           to_tsquery('english', ${tsQuery})
         ) AS rank
       FROM "Reel" r
-      WHERE to_tsvector('english', COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
+      WHERE to_tsvector('english', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
         @@ to_tsquery('english', ${tsQuery})
       ORDER BY rank DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -83,11 +83,11 @@ export async function fullTextSearch(
         r."summary",
         r."thumbnailUrl",
         ts_rank(
-          to_tsvector('simple', COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
+          to_tsvector('simple', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
           to_tsquery('simple', ${tsQuery})
         ) AS rank
       FROM "Reel" r
-      WHERE to_tsvector('simple', COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
+      WHERE to_tsvector('simple', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
         @@ to_tsquery('simple', ${tsQuery})
       ORDER BY rank DESC
       LIMIT ${limit} OFFSET ${offset}

@@ -37,28 +37,28 @@ export async function normalizeTags(
 
   const uniqueTags = [...new Set(normalizedTags.filter((t) => t.length > 0))]
 
-  await prisma.$transaction(async (tx) => {
-    const tagRecords = await Promise.all(
-      uniqueTags.map((name) =>
-        tx.tag.upsert({
-          where: { name },
-          create: { name },
-          update: {},
-        })
-      )
-    )
-
-    await tx.reel.update({
-      where: { id: reelId },
-      data: {
-        title: metadata.title,
-        summary: metadata.summary,
-        transcript: metadata.transcript,
-        language: metadata.language,
-        tags: {
-          set: tagRecords.map((tag) => ({ id: tag.id })),
-        },
-      },
+  // Upsert tags outside the transaction to avoid timeout on Supabase pooler
+  const tagRecords = []
+  for (const name of uniqueTags) {
+    const tag = await prisma.tag.upsert({
+      where: { name },
+      create: { name },
+      update: {},
     })
+    tagRecords.push(tag)
+  }
+
+  // Update reel metadata and connect tags
+  await prisma.reel.update({
+    where: { id: reelId },
+    data: {
+      title: metadata.title,
+      summary: metadata.summary,
+      transcript: metadata.transcript,
+      language: metadata.language,
+      tags: {
+        set: tagRecords.map((tag) => ({ id: tag.id })),
+      },
+    },
   })
 }

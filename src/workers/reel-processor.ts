@@ -1,3 +1,7 @@
+import "dotenv/config"
+import { config } from "dotenv"
+config({ path: ".env.local", override: true })
+
 import { Worker, Job } from "bullmq"
 import { prisma } from "../lib/prisma"
 import { downloadReel } from "../services/downloader"
@@ -53,7 +57,12 @@ async function processReel(job: Job<ReelJobData>) {
         transcript: transcription.text,
         language: analysis.language,
       }),
-      embedAndStore(reelId, analysis.summary),
+      embedAndStore(
+        reelId,
+        [analysis.title, analysis.summary, transcription.text?.slice(0, 2000)]
+          .filter(Boolean)
+          .join("\n"),
+      ),
     ])
     await job.updateProgress(90)
 

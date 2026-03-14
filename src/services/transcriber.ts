@@ -29,6 +29,11 @@ function mapLanguage(whisperLanguage: string | undefined): DetectedLanguage {
 export async function transcribe(
   audioPath: string
 ): Promise<TranscriptionResult> {
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "sk-your-openai-key") {
+    console.warn("[Transcriber] OPENAI_API_KEY not set, skipping transcription")
+    return { text: "", language: "none" }
+  }
+
   try {
     const fileStream = createReadStream(audioPath)
 

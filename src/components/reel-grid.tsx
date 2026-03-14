@@ -10,11 +10,15 @@ import { cn } from "@/lib/utils"
 interface ReelGridProps {
   tags?: string[]
   q?: string
+  language?: string
+  dateFrom?: string
+  dateTo?: string
+  status?: string
   onReelClick?: (reelId: string) => void
   onClearFilters?: () => void
 }
 
-export function ReelGrid({ tags, q, onReelClick, onClearFilters }: ReelGridProps) {
+export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, onReelClick, onClearFilters }: ReelGridProps) {
   const {
     data,
     isLoading,
@@ -23,7 +27,7 @@ export function ReelGrid({ tags, q, onReelClick, onClearFilters }: ReelGridProps
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useReels({ tags, q })
+  } = useReels({ tags, q, language, dateFrom, dateTo, status })
 
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -74,12 +78,17 @@ export function ReelGrid({ tags, q, onReelClick, onClearFilters }: ReelGridProps
 
   const allReels = data?.pages.flatMap((page) => page.data) ?? []
 
-  const hasFilters = Boolean(tags?.length || q)
+  const hasFilters = Boolean(tags?.length || q || language || dateFrom || dateTo || status)
+
+  const total = data?.pages[0]?.meta?.total ?? 0
+  const highlightTerms = q ? q.split(/\s+/).filter(Boolean) : []
 
   if (allReels.length === 0) {
+    const emptyVariant = q ? "search" : hasFilters ? "filtered" : "initial"
     return (
       <EmptyState
-        variant={hasFilters ? "filtered" : "initial"}
+        variant={emptyVariant}
+        searchQuery={q}
         onClearFilters={hasFilters ? onClearFilters : undefined}
       />
     )
@@ -87,13 +96,26 @@ export function ReelGrid({ tags, q, onReelClick, onClearFilters }: ReelGridProps
 
   return (
     <div>
+      {/* Result count */}
+      {hasFilters && (
+        <p className="mb-3 text-sm text-muted-foreground">
+          {total} {total === 1 ? "result" : "results"}
+          {q ? ` for "${q}"` : ""}
+        </p>
+      )}
+
       <div
         className={cn(
           "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
         )}
       >
         {allReels.map((reel) => (
-          <ReelCard key={reel.id} reel={reel} onClick={handleReelClick} />
+          <ReelCard
+            key={reel.id}
+            reel={reel}
+            onClick={handleReelClick}
+            highlightTerms={highlightTerms}
+          />
         ))}
       </div>
 

@@ -82,19 +82,23 @@ export async function downloadReel(
   const thumbExt = path.extname(thumbFile).slice(1)
   const contentType = `image/${thumbExt === "jpg" ? "jpeg" : thumbExt}`
 
-  // Upload thumbnail to Supabase Storage
-  const thumbnailUrl = await uploadFile(
-    "thumbnails",
-    `${reelId}/thumb.${thumbExt}`,
-    thumbBuffer,
-    contentType
-  )
+  // Upload thumbnail to Supabase Storage (non-fatal)
+  let thumbnailUrl = ""
+  try {
+    thumbnailUrl = await uploadFile(
+      "thumbnails",
+      `${reelId}/thumb.${thumbExt}`,
+      thumbBuffer,
+      contentType
+    )
 
-  // Update reel record with thumbnail URL
-  await prisma.reel.update({
-    where: { id: reelId },
-    data: { thumbnailUrl },
-  })
+    await prisma.reel.update({
+      where: { id: reelId },
+      data: { thumbnailUrl },
+    })
+  } catch (err) {
+    console.warn(`[Downloader] Thumbnail upload failed for ${reelId}, continuing:`, err instanceof Error ? err.message : err)
+  }
 
   return { videoPath, audioPath, thumbnailUrl }
 }

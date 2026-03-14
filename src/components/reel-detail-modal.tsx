@@ -71,11 +71,21 @@ export function ReelDetailModal({ reelId, onClose }: ReelDetailModalProps) {
     <Dialog open={!!reelId} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         {isLoading ? (
-          <LoadingSkeleton />
+          <>
+            <DialogHeader>
+              <DialogTitle className="sr-only">Loading reel details</DialogTitle>
+            </DialogHeader>
+            <LoadingSkeleton />
+          </>
         ) : isError ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            Failed to load reel details. Please try again.
-          </div>
+          <>
+            <DialogHeader>
+              <DialogTitle className="sr-only">Error loading reel</DialogTitle>
+            </DialogHeader>
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Failed to load reel details. Please try again.
+            </div>
+          </>
         ) : reel ? (
           <ReelContent reel={reel} onClose={onClose} />
         ) : null}

@@ -115,12 +115,18 @@ export async function analyzeReel(
 ): Promise<AnalysisResult> {
   const rawText = await callWithRetry(frames, transcript)
 
+  // Strip markdown code fences if present
+  const cleanedText = rawText
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim()
+
   let parsed: unknown
   try {
-    parsed = JSON.parse(rawText)
+    parsed = JSON.parse(cleanedText)
   } catch {
     throw new Error(
-      `Failed to parse Claude response as JSON: ${rawText.slice(0, 200)}`
+      `Failed to parse Claude response as JSON: ${cleanedText.slice(0, 200)}`
     )
   }
 

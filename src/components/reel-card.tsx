@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import Image from "next/image"
 import { Film, RotateCcw } from "lucide-react"
 
@@ -8,6 +8,25 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+
+function highlightText(text: string, terms: string[]): ReactNode {
+  if (!terms.length) return text
+  const escaped = terms
+    .filter(Boolean)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  if (!escaped.length) return text
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi")
+  const parts = text.split(regex)
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark key={i} className="bg-yellow-200 text-inherit rounded-sm px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  )
+}
 
 interface ReelCardProps {
   reel: {
@@ -22,6 +41,7 @@ interface ReelCardProps {
     addedBy?: { name: string | null; image: string | null }
   }
   onClick?: (reelId: string) => void
+  highlightTerms?: string[]
 }
 
 function formatRelativeDate(date: string): string {
@@ -55,7 +75,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const MAX_VISIBLE_TAGS = 5
 
-export function ReelCard({ reel, onClick }: ReelCardProps) {
+export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) {
   const [isRetrying, setIsRetrying] = useState(false)
   const visibleTags = reel.tags.slice(0, MAX_VISIBLE_TAGS)
   const remainingCount = reel.tags.length - MAX_VISIBLE_TAGS
@@ -153,13 +173,15 @@ export function ReelCard({ reel, onClick }: ReelCardProps) {
 
         {/* Title */}
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
-          {reel.title ?? "Untitled Reel"}
+          {reel.title
+            ? highlightText(reel.title, highlightTerms)
+            : "Untitled Reel"}
         </h3>
 
         {/* Summary */}
         {reel.summary && (
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-            {reel.summary}
+            {highlightText(reel.summary, highlightTerms)}
           </p>
         )}
 
