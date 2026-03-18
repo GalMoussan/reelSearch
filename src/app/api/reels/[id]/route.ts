@@ -23,6 +23,12 @@ export async function GET(
         addedBy: {
           select: { id: true, name: true, image: true },
         },
+        collections: {
+          where: { collection: { userId: session.user.id } },
+          include: {
+            collection: { select: { id: true, name: true, color: true } },
+          },
+        },
       },
     })
 
@@ -33,7 +39,40 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ data: reel })
+    // Record view (fire and forget)
+    prisma.reelView
+      .upsert({
+        where: {
+          reelId_userId: {
+            reelId: id,
+            userId: session.user.id,
+          },
+        },
+        update: { viewedAt: new Date() },
+        create: {
+          reelId: id,
+          userId: session.user.id,
+        },
+      })
+      .catch((err) => console.error("Failed to record view:", err))
+
+    // Fetch user's note
+    const note = await prisma.reelNote.findUnique({
+      where: {
+        reelId_userId: {
+          reelId: id,
+          userId: session.user.id,
+        },
+      },
+    })
+
+    return NextResponse.json({
+      data: {
+        ...reel,
+        collections: reel.collections.map((cr) => cr.collection),
+        note: note?.content ?? null,
+      },
+    })
   } catch (error) {
     console.error(`GET /api/reels/[id] error:`, error)
     return NextResponse.json(

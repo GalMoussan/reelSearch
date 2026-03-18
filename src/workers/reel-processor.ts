@@ -21,6 +21,13 @@ interface ReelJobData {
   reelId: string
 }
 
+async function setStep(reelId: string, step: string) {
+  await prisma.reel.update({
+    where: { id: reelId },
+    data: { processingStep: step },
+  })
+}
+
 async function processReel(job: Job<ReelJobData>) {
   const { reelId } = job.data
   const startTime = Date.now()
@@ -29,16 +36,17 @@ async function processReel(job: Job<ReelJobData>) {
     // 1. Get reel from DB and update to PROCESSING
     const reel = await prisma.reel.update({
       where: { id: reelId },
-      data: { status: "PROCESSING" },
+      data: { status: "PROCESSING", processingStep: "downloading" },
     })
 
     console.log(`[Worker] Processing reel: ${reelId} (${reel.url})`)
 
-    // 2. Download video, audio, thumbnail
+    // 2. Download video + extract audio
     const { videoPath, audioPath } = await downloadReel(reelId, reel.url)
     await job.updateProgress(20)
 
     // 3. Transcribe audio and extract frames IN PARALLEL
+    await setStep(reelId, "transcribing")
     const [transcription, frames] = await Promise.all([
       transcribe(audioPath),
       extractFrames(videoPath),
@@ -46,10 +54,12 @@ async function processReel(job: Job<ReelJobData>) {
     await job.updateProgress(50)
 
     // 4. Analyze with Claude Vision
+    await setStep(reelId, "analyzing")
     const analysis = await analyzeReel(frames, transcription.text)
     await job.updateProgress(70)
 
     // 5. Normalize tags + store metadata, and generate embeddings IN PARALLEL
+    await setStep(reelId, "saving")
     await Promise.all([
       normalizeTags(reelId, analysis.tags, {
         title: analysis.title,
@@ -70,7 +80,7 @@ async function processReel(job: Job<ReelJobData>) {
     await cleanupTempFiles(reelId)
     await prisma.reel.update({
       where: { id: reelId },
-      data: { status: "DONE" },
+      data: { status: "DONE", processingStep: null },
     })
     await job.updateProgress(100)
 
@@ -87,6 +97,7 @@ async function processReel(job: Job<ReelJobData>) {
         where: { id: reelId },
         data: {
           status: "FAILED",
+          processingStep: null,
           errorMessage,
         },
       })

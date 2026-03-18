@@ -8,6 +8,15 @@ interface ProcessingStatusProps {
   reelId: string | null
 }
 
+const STEP_LABELS: Record<string, string> = {
+  downloading: "Downloading video...",
+  transcribing: "Transcribing audio & extracting frames...",
+  analyzing: "Analyzing content with AI...",
+  saving: "Saving tags & metadata...",
+}
+
+const STEP_ORDER = ["downloading", "transcribing", "analyzing", "saving"]
+
 export function ProcessingStatus({ reelId }: ProcessingStatusProps) {
   const { data: reel, isLoading } = useReelStatus(reelId)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -27,13 +36,14 @@ export function ProcessingStatus({ reelId }: ProcessingStatusProps) {
   if (!isLoading && !reel) return null
 
   const status = reel?.status
+  const step = reel?.processingStep as string | undefined
 
   return (
     <div
       className={cn(
         "mt-4 overflow-hidden transition-all duration-300 ease-out",
         showSuccess || status
-          ? "max-h-20 opacity-100"
+          ? "max-h-40 opacity-100"
           : "max-h-0 opacity-0"
       )}
     >
@@ -46,19 +56,47 @@ export function ProcessingStatus({ reelId }: ProcessingStatusProps) {
         )}
 
         {status === "PROCESSING" && (
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1">
-              <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-              <span
-                className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"
-                style={{ animationDelay: "0.2s" }}
-              />
-              <span
-                className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"
-                style={{ animationDelay: "0.4s" }}
-              />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                <span
+                  className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"
+                  style={{ animationDelay: "0.2s" }}
+                />
+                <span
+                  className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </div>
+              <span className="text-gray-700">
+                {step ? STEP_LABELS[step] ?? "Processing..." : "Processing..."}
+              </span>
             </div>
-            <span className="text-gray-700">Processing reel...</span>
+
+            {/* Step progress dots */}
+            {step && (
+              <div className="flex items-center gap-1.5 pl-7">
+                {STEP_ORDER.map((s) => {
+                  const currentIdx = STEP_ORDER.indexOf(step)
+                  const thisIdx = STEP_ORDER.indexOf(s)
+                  const isDone = thisIdx < currentIdx
+                  const isCurrent = s === step
+
+                  return (
+                    <div
+                      key={s}
+                      className={cn(
+                        "h-1.5 flex-1 rounded-full transition-colors",
+                        isDone && "bg-blue-500",
+                        isCurrent && "bg-blue-400 animate-pulse",
+                        !isDone && !isCurrent && "bg-gray-200",
+                      )}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

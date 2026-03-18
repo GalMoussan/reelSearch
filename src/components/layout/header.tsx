@@ -45,6 +45,12 @@ export function Header() {
               >
                 Tags
               </Link>
+              <Link
+                href="/collections"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Collections
+              </Link>
             </nav>
           </div>
 

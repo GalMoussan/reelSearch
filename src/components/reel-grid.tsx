@@ -14,11 +14,26 @@ interface ReelGridProps {
   dateFrom?: string
   dateTo?: string
   status?: string
+  collectionId?: string
   onReelClick?: (reelId: string) => void
   onClearFilters?: () => void
+  initialData?: {
+    data: Array<{
+      id: string
+      title: string | null
+      summary: string | null
+      thumbnailUrl: string | null
+      status: string
+      errorMessage?: string | null
+      createdAt: string
+      tags: Array<{ id: string; name: string }>
+      addedBy?: { name: string | null; image: string | null }
+    }>
+    meta: { page: number; limit: number; total: number; totalPages: number }
+  }
 }
 
-export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, onReelClick, onClearFilters }: ReelGridProps) {
+export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collectionId, onReelClick, onClearFilters, initialData }: ReelGridProps) {
   const {
     data,
     isLoading,
@@ -27,7 +42,7 @@ export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, onReelCl
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useReels({ tags, q, language, dateFrom, dateTo, status })
+  } = useReels({ tags, q, language, dateFrom, dateTo, status, collectionId, initialData })
 
   const sentinelRef = useRef<HTMLDivElement>(null)
 

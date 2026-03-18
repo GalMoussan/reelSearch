@@ -77,7 +77,7 @@ async function callWithRetry(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await getAnthropic().messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: process.env.ANALYZER_MODEL ?? "claude-haiku-4-5-20251001",
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],

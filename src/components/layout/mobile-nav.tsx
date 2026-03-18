@@ -58,6 +58,13 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
           >
             Tags
           </Link>
+          <Link
+            href="/collections"
+            onClick={onClose}
+            className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            Collections
+          </Link>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t p-4">

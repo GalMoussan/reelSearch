@@ -3,7 +3,15 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { ExternalLink, Film } from "lucide-react"
+import { ExternalLink, Film, ArrowRight } from "lucide-react"
+
+function getPlatformLabel(url: string): string {
+  if (url.includes("facebook.com") || url.includes("fb.watch")) return "Facebook"
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "YouTube"
+  if (url.includes("twitter.com") || url.includes("x.com")) return "X"
+  if (url.includes("reddit.com") || url.includes("redd.it")) return "Reddit"
+  return "Instagram"
+}
 
 import {
   Dialog,
@@ -210,9 +218,21 @@ function ReelContent({
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          View on Instagram
+          View on {getPlatformLabel(reel.url)}
           <ExternalLink className="h-4 w-4" />
         </a>
+      </div>
+
+      {/* Full page link */}
+      <div className="border-t pt-4">
+        <Link
+          href={`/reels/${reel.id}`}
+          onClick={onClose}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          Open full page
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   )

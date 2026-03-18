@@ -26,8 +26,9 @@ model Reel {
   thumbnailUrl String?
   language     String?
   embedding    Unsupported("vector(1536)")?
-  status       ReelStatus             @default(PENDING)
-  errorMessage String?
+  status         ReelStatus             @default(PENDING)
+  processingStep String?
+  errorMessage   String?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
@@ -35,6 +36,9 @@ model Reel {
   addedBy      User                   @relation(fields: [addedById], references: [id], onDelete: Cascade)
 
   tags         Tag[]
+  collections  CollectionReel[]
+  notes        ReelNote[]
+  views        ReelView[]
 
   @@index([status])
   @@index([createdAt])
@@ -54,9 +58,12 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
 
-  reels    Reel[]
-  accounts Account[]
-  sessions Session[]
+  reels       Reel[]
+  collections Collection[]
+  notes       ReelNote[]
+  reelViews   ReelView[]
+  accounts    Account[]
+  sessions    Session[]
 }
 
 model Account {
@@ -93,4 +100,61 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Collection {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reels       CollectionReel[]
+
+  @@index([userId])
+}
+
+model CollectionReel {
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  reelId       String
+  reel         Reel       @relation(fields: [reelId], references: [id], onDelete: Cascade)
+
+  addedAt      DateTime   @default(now())
+
+  @@id([collectionId, reelId])
+}
+
+model ReelNote {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reelId    String
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
+}
+
+model ReelView {
+  id        String   @id @default(cuid())
+  viewedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reelId    String
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
 }

@@ -153,12 +153,9 @@ export async function extractFrames(
   const frameCount = determineFrameCount(duration, count)
   const timestamps = calculateTimestamps(duration, frameCount)
 
-  const frames: string[] = []
-
-  for (const timestamp of timestamps) {
-    const base64Frame = await extractFrameAtTimestamp(videoPath, timestamp)
-    frames.push(base64Frame)
-  }
+  const frames = await Promise.all(
+    timestamps.map((timestamp) => extractFrameAtTimestamp(videoPath, timestamp))
+  )
 
   return frames
 }

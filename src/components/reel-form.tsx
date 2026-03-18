@@ -132,11 +132,11 @@ export function ReelForm({ onSubmitted }: ReelFormProps) {
               setBulkText(e.target.value)
               if (validationError) setValidationError(null)
             }}
-            placeholder={"Paste one URL per line...\nhttps://www.instagram.com/reel/ABC123\nhttps://www.instagram.com/reel/DEF456"}
+            placeholder={"Paste one URL per line...\nhttps://www.instagram.com/reel/ABC123\nhttps://www.youtube.com/shorts/xyz"}
             disabled={isSubmitting}
             rows={4}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Instagram Reel URLs (one per line)"
+            aria-label="Reel URLs (one per line)"
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
@@ -180,9 +180,9 @@ export function ReelForm({ onSubmitted }: ReelFormProps) {
               setUrl(e.target.value)
               if (validationError) setValidationError(null)
             }}
-            placeholder="Paste Instagram Reel URL..."
+            placeholder="Paste a video URL (Instagram, YouTube, X, Reddit, Facebook)..."
             disabled={isSubmitting}
-            aria-label="Instagram Reel URL"
+            aria-label="Reel URL"
             className="flex-1"
           />
           <Button type="submit" disabled={isSubmitting || url.trim().length === 0}>

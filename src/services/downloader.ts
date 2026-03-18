@@ -12,13 +12,13 @@ export type DownloadResult = {
 
 const TEMP_BASE = "/tmp/reelsearch"
 
-function exec(command: string, args: string[]): Promise<string> {
+function exec(command: string, args: string[], timeoutMs = 120_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(command, args, { timeout: 120_000 }, (error, stdout, stderr) => {
+    execFile(command, args, { timeout: timeoutMs }, (error, stdout, stderr) => {
       if (error) {
         reject(
           new Error(
-            `yt-dlp failed: ${error.message}\nstderr: ${stderr}\nstdout: ${stdout}`
+            `${command} failed: ${error.message}\nstderr: ${stderr}\nstdout: ${stdout}`
           )
         )
         return
@@ -39,65 +39,56 @@ export async function downloadReel(
   const audioPath = path.join(tempDir, "audio.mp3")
   const thumbBase = path.join(tempDir, "thumb")
 
-  // Download video
+  // Single yt-dlp call: download video + thumbnail together
   await exec("yt-dlp", [
-    "-o",
-    videoPath,
-    "--format",
-    "best[ext=mp4]",
-    url,
-  ])
-
-  // Download audio
-  await exec("yt-dlp", [
-    "-o",
-    audioPath,
-    "--extract-audio",
-    "--audio-format",
-    "mp3",
-    url,
-  ])
-
-  // Download thumbnail
-  await exec("yt-dlp", [
+    "-o", videoPath,
+    "--format", "best[ext=mp4]/best",
     "--write-thumbnail",
-    "--skip-download",
-    "-o",
-    thumbBase,
+    "--convert-thumbnails", "jpg",
     url,
   ])
 
-  // Find the thumbnail file (yt-dlp may produce .jpg, .webp, .png, etc.)
+  // Extract audio locally with ffmpeg (much faster than re-downloading)
+  await exec("ffmpeg", [
+    "-i", videoPath,
+    "-vn",
+    "-acodec", "libmp3lame",
+    "-q:a", "4",
+    "-y",
+    audioPath,
+  ], 30_000)
+
+  // Find the thumbnail file (yt-dlp writes it next to the video)
   const files = await readdir(tempDir)
   const thumbFile = files.find(
-    (f) => f.startsWith("thumb.") && f !== "thumb"
+    (f) => (f.startsWith("video.") || f.startsWith("thumb.")) && /\.(jpg|jpeg|webp|png)$/i.test(f) && f !== "video.mp4"
   )
-
-  if (!thumbFile) {
-    throw new Error(`Thumbnail not found in ${tempDir} after yt-dlp download`)
-  }
-
-  const thumbPath = path.join(tempDir, thumbFile)
-  const thumbBuffer = await readFile(thumbPath)
-  const thumbExt = path.extname(thumbFile).slice(1)
-  const contentType = `image/${thumbExt === "jpg" ? "jpeg" : thumbExt}`
 
   // Upload thumbnail to Supabase Storage (non-fatal)
   let thumbnailUrl = ""
-  try {
-    thumbnailUrl = await uploadFile(
-      "thumbnails",
-      `${reelId}/thumb.${thumbExt}`,
-      thumbBuffer,
-      contentType
-    )
+  if (thumbFile) {
+    const thumbPath = path.join(tempDir, thumbFile)
+    const thumbBuffer = await readFile(thumbPath)
+    const thumbExt = path.extname(thumbFile).slice(1)
+    const contentType = `image/${thumbExt === "jpg" ? "jpeg" : thumbExt}`
 
-    await prisma.reel.update({
-      where: { id: reelId },
-      data: { thumbnailUrl },
-    })
-  } catch (err) {
-    console.warn(`[Downloader] Thumbnail upload failed for ${reelId}, continuing:`, err instanceof Error ? err.message : err)
+    try {
+      thumbnailUrl = await uploadFile(
+        "thumbnails",
+        `${reelId}/thumb.${thumbExt}`,
+        thumbBuffer,
+        contentType
+      )
+
+      await prisma.reel.update({
+        where: { id: reelId },
+        data: { thumbnailUrl },
+      })
+    } catch (err) {
+      console.warn(`[Downloader] Thumbnail upload failed for ${reelId}, continuing:`, err instanceof Error ? err.message : err)
+    }
+  } else {
+    console.warn(`[Downloader] No thumbnail found for ${reelId}, continuing without`)
   }
 
   return { videoPath, audioPath, thumbnailUrl }

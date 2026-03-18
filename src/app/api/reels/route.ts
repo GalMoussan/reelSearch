@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get("dateFrom")
     const dateTo = searchParams.get("dateTo")
     const status = searchParams.get("status")
+    const collectionId = searchParams.get("collectionId")
 
     const page = parseInt(pageParam, 10)
     const limit = parseInt(limitParam, 10)
@@ -54,9 +55,12 @@ export async function GET(request: NextRequest) {
         .filter(Boolean)
 
       if (tagsArray.length > 0) {
-        conditions.push({
-          tags: { some: { name: { in: tagsArray } } },
-        })
+        // AND logic: reel must have ALL selected tags
+        for (const tag of tagsArray) {
+          conditions.push({
+            tags: { some: { name: tag } },
+          })
+        }
       }
     }
 
@@ -80,6 +84,12 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       conditions.push({ status: status as "PENDING" | "PROCESSING" | "DONE" | "FAILED" })
+    }
+
+    if (collectionId) {
+      conditions.push({
+        collections: { some: { collectionId } },
+      })
     }
 
     // Hybrid search: FTS + semantic when q is provided
@@ -136,6 +146,35 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit
 
+    if (rankedIds) {
+      // When hybrid search is active, paginate the ranked IDs first,
+      // then fetch only that page's IDs from Prisma (preserving rank order)
+      const total = rankedIds.length
+      const pageIds = rankedIds.slice(skip, skip + limit)
+
+      const reels = pageIds.length > 0
+        ? await prisma.reel.findMany({
+            where: { ...where, id: { in: pageIds } },
+            include: {
+              tags: true,
+              addedBy: { select: { id: true, name: true, image: true } },
+            },
+          })
+        : []
+
+      // Re-sort to match the RRF rank order
+      const idOrder = new Map(pageIds.map((id, idx) => [id, idx]))
+      const sortedReels = reels.sort(
+        (a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+      )
+
+      const totalPages = Math.ceil(total / limit)
+      return NextResponse.json({
+        data: sortedReels,
+        meta: { page, limit, total, totalPages },
+      })
+    }
+
     const [reels, total] = await Promise.all([
       prisma.reel.findMany({
         where,
@@ -150,19 +189,10 @@ export async function GET(request: NextRequest) {
       prisma.reel.count({ where }),
     ])
 
-    // Re-sort results by hybrid rank order
-    const sortedReels = rankedIds
-      ? reels.sort((a, b) => {
-          const aIdx = rankedIds.indexOf(a.id)
-          const bIdx = rankedIds.indexOf(b.id)
-          return aIdx - bIdx
-        })
-      : reels
-
     const totalPages = Math.ceil(total / limit)
 
     return NextResponse.json({
-      data: sortedReels,
+      data: reels,
       meta: { page, limit, total, totalPages },
     })
   } catch (error) {
