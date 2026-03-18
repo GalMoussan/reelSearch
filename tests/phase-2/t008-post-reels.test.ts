@@ -16,6 +16,10 @@ vi.mock('@/lib/queue', () => ({
   addReelJob: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9 }),
+}))
+
 vi.mock('@/lib/auth-utils', () => ({
   requireAuth: vi.fn().mockResolvedValue({
     user: { id: 'user-123', name: 'Test', email: 'test@test.com' },

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
 import { fullTextSearch, semanticSearch } from "@/services/search"
@@ -8,12 +9,13 @@ function getAnthropic() {
   return new Anthropic()
 }
 
-export interface SearchPlan {
-  keywords: string[]
-  tags: string[]
-  semanticQuery: string
-  reasoning: string
-}
+const searchPlanSchema = z.object({
+  keywords: z.array(z.string()),
+  tags: z.array(z.string()),
+  semanticQuery: z.string(),
+  reasoning: z.string(),
+})
+export type SearchPlan = z.infer<typeof searchPlanSchema>
 
 export interface NLSearchResult {
   data: SearchResult[]
@@ -43,7 +45,31 @@ async function decompose(query: string): Promise<SearchPlan> {
   const text =
     message.content[0].type === "text" ? message.content[0].text : ""
 
-  return JSON.parse(text) as SearchPlan
+  // Strip markdown code fences if present
+  const cleanedText = text
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim()
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(cleanedText)
+  } catch {
+    throw new Error(
+      `Failed to parse search plan as JSON: ${cleanedText.slice(0, 200)}`,
+    )
+  }
+
+  const result = searchPlanSchema.safeParse(parsed)
+
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ")
+    throw new Error(`Search plan validation failed: ${issues}`)
+  }
+
+  return result.data
 }
 
 function deduplicateResults(

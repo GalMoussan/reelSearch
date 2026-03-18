@@ -1,57 +1,130 @@
-import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
-const srcDir = resolve(__dirname, '../../src')
+// Mock @tanstack/react-query
+const mockUseQuery = vi.fn();
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => ({}),
+}));
 
-describe('T031 — Reel Detail Modal', () => {
-  it('should have a reel detail modal component at src/components/reel-detail-modal.tsx', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    expect(existsSync(modalPath)).toBe(true)
-  })
+// Mock next/image
+vi.mock("next/image", () => ({
+  default: (props: Record<string, unknown>) => <img {...props} />,
+}));
 
-  it('should use Dialog component', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    const content = readFileSync(modalPath, 'utf-8')
+// Mock next/link
+vi.mock("next/link", () => ({
+  default: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
+    <a {...props}>{children}</a>
+  ),
+}));
 
-    expect(content).toContain('Dialog')
-    expect(content).toContain('DialogContent')
-    expect(content).toMatch(/import[\s\S]*Dialog/)
-  })
+// Mock dialog components to render children directly
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  DialogClose: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+}));
 
-  it('should render the full transcript', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    const content = readFileSync(modalPath, 'utf-8')
+// Mock lucide-react icons
+vi.mock("lucide-react", () => ({
+  ExternalLink: (props: Record<string, unknown>) => <div data-testid="external-link-icon" {...props} />,
+  X: (props: Record<string, unknown>) => <div data-testid="x-icon" {...props} />,
+  Film: (props: Record<string, unknown>) => <div data-testid="film-icon" {...props} />,
+  Tag: (props: Record<string, unknown>) => <div data-testid="tag-icon" {...props} />,
+  Clock: (props: Record<string, unknown>) => <div data-testid="clock-icon" {...props} />,
+  Loader2: (props: Record<string, unknown>) => <div data-testid="loader-icon" {...props} />,
+  FileText: (props: Record<string, unknown>) => <div data-testid="file-text-icon" {...props} />,
+  User: (props: Record<string, unknown>) => <div data-testid="user-icon" {...props} />,
+  ArrowRight: (props: Record<string, unknown>) => <div data-testid="arrow-right-icon" {...props} />,
+  ChevronDown: (props: Record<string, unknown>) => <div data-testid="chevron-down-icon" {...props} />,
+  ChevronUp: (props: Record<string, unknown>) => <div data-testid="chevron-up-icon" {...props} />,
+}));
 
-    expect(content).toContain('transcript')
-    expect(content).toContain('Transcript')
-  })
+import { ReelDetailModal } from "@/components/reel-detail-modal";
 
-  it('should render all tags (not truncated)', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    const content = readFileSync(modalPath, 'utf-8')
+const mockReelData = {
+  id: "reel-1",
+  title: "Test Reel",
+  summary: "A summary",
+  transcript: "This is the full transcript of the reel content.",
+  thumbnailUrl: "https://example.com/thumb.jpg",
+  url: "https://instagram.com/reel/123",
+  status: "COMPLETED",
+  createdAt: new Date().toISOString(),
+  tags: [
+    { id: "t1", name: "cooking" },
+    { id: "t2", name: "recipes" },
+    { id: "t3", name: "italian" },
+  ],
+  addedBy: { name: "Test User" },
+};
 
-    expect(content).toContain('reel.tags')
-    expect(content).toContain('tags.map')
-    // Should NOT have MAX_VISIBLE_TAGS truncation like ReelCard
-    expect(content).not.toContain('MAX_VISIBLE_TAGS')
-  })
+describe("T031 — Reel Detail Modal", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-  it('should render a link to the original Instagram URL', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    const content = readFileSync(modalPath, 'utf-8')
+  it("does not render the dialog when reelId is null", () => {
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
 
-    expect(content).toContain('reel.url')
-    expect(content).toContain('target="_blank"')
-    expect(content).toContain('View on Instagram')
-  })
+    render(<ReelDetailModal reelId={null} onClose={vi.fn()} />);
 
-  it('should fetch reel detail by ID', () => {
-    const modalPath = resolve(srcDir, 'components/reel-detail-modal.tsx')
-    const content = readFileSync(modalPath, 'utf-8')
+    expect(screen.queryByTestId("dialog")).not.toBeInTheDocument();
+  });
 
-    expect(content).toContain('reelId')
-    expect(content).toContain('/api/reels/')
-    expect(content).toContain('useQuery')
-  })
-})
+  it("renders transcript content when reel data is available", () => {
+    mockUseQuery.mockReturnValue({
+      data: mockReelData,
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ReelDetailModal reelId="reel-1" onClose={vi.fn()} />);
+
+    expect(
+      screen.getByText("This is the full transcript of the reel content.")
+    ).toBeInTheDocument();
+  });
+
+  it("renders all tags without truncation", () => {
+    mockUseQuery.mockReturnValue({
+      data: mockReelData,
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ReelDetailModal reelId="reel-1" onClose={vi.fn()} />);
+
+    expect(screen.getByText("cooking")).toBeInTheDocument();
+    expect(screen.getByText("recipes")).toBeInTheDocument();
+    expect(screen.getByText("italian")).toBeInTheDocument();
+  });
+
+  it("renders an external link with target='_blank'", () => {
+    mockUseQuery.mockReturnValue({
+      data: mockReelData,
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ReelDetailModal reelId="reel-1" onClose={vi.fn()} />);
+
+    const externalLink = screen.getByText(/view on instagram/i)?.closest("a");
+    expect(externalLink).toHaveAttribute("target", "_blank");
+    expect(externalLink).toHaveAttribute("href", "https://instagram.com/reel/123");
+  });
+});

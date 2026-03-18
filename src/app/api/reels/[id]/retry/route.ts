@@ -3,13 +3,22 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { addReelJob } from "@/lib/queue"
+import { rateLimit } from "@/lib/rate-limit"
 
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAuth()
+    const session = await requireAuth()
+
+    const { allowed } = await rateLimit(`rl:reels-retry:${session.user.id}`, 5, 60)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      )
+    }
 
     const { id } = await params
 
@@ -17,6 +26,10 @@ export async function POST(
 
     if (!reel) {
       return NextResponse.json({ error: "Reel not found" }, { status: 404 })
+    }
+
+    if (reel.addedById !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     if (reel.status !== "FAILED") {

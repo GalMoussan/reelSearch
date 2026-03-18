@@ -1,38 +1,51 @@
-import { describe, it, expect, vi } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const ROOT = resolve(__dirname, '../..')
+vi.mock("fs/promises", () => ({
+  rm: vi.fn().mockResolvedValue(undefined),
+}));
 
-describe('T015 — Temp File Cleanup', () => {
-  it('should export cleanupTempFiles function from cleanup.ts', () => {
-    const cleanupPath = resolve(ROOT, 'src/services/cleanup.ts')
-    expect(existsSync(cleanupPath)).toBe(true)
-    const content = readFileSync(cleanupPath, 'utf-8')
-    expect(content).toContain('export')
-    expect(content).toContain('cleanupTempFiles')
-  })
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    reel: {
+      update: vi.fn().mockResolvedValue({}),
+    },
+  },
+}));
 
-  it('should use fs.rm with recursive and force options', () => {
-    const cleanupPath = resolve(ROOT, 'src/services/cleanup.ts')
-    const content = readFileSync(cleanupPath, 'utf-8')
-    expect(content).toContain('rm')
-    expect(content).toContain('recursive: true')
-    expect(content).toContain('force: true')
-  })
+import { cleanupTempFiles, markReelDone } from "@/services/cleanup";
+import { rm } from "fs/promises";
+import { prisma } from "@/lib/prisma";
 
-  it('should export markReelDone to update reel status', () => {
-    const cleanupPath = resolve(ROOT, 'src/services/cleanup.ts')
-    const content = readFileSync(cleanupPath, 'utf-8')
-    expect(content).toContain('export async function markReelDone')
-    expect(content).toContain('status: "DONE"')
-  })
+const mockedRm = vi.mocked(rm);
 
-  it('should not throw if temp directory does not exist', () => {
-    const cleanupPath = resolve(ROOT, 'src/services/cleanup.ts')
-    const content = readFileSync(cleanupPath, 'utf-8')
-    // Verify it catches errors and logs a warning instead of throwing
-    expect(content).toContain('catch')
-    expect(content).toContain('console.warn')
-  })
-})
+describe("T015 — Temp File Cleanup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls rm with correct path and recursive+force options", async () => {
+    await cleanupTempFiles("reel-123");
+
+    expect(mockedRm).toHaveBeenCalledWith(
+      expect.stringContaining("/tmp/reelsearch/reel-123"),
+      expect.objectContaining({ recursive: true, force: true }),
+    );
+  });
+
+  it("does not throw when rm fails", async () => {
+    mockedRm.mockRejectedValue(new Error("ENOENT: no such file or directory"));
+
+    await expect(cleanupTempFiles("reel-123")).resolves.not.toThrow();
+  });
+
+  it("markReelDone updates reel status to DONE", async () => {
+    await markReelDone("reel-456");
+
+    expect(prisma.reel.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "reel-456" }),
+        data: expect.objectContaining({ status: "DONE" }),
+      }),
+    );
+  });
+});

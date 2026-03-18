@@ -1,54 +1,75 @@
-import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import React from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
-const srcDir = resolve(__dirname, '../../src')
+// Mock use-tags hook
+vi.mock("@/hooks/use-tags", () => ({
+  useTags: () => ({ data: [] }),
+}));
 
-describe('T029 — Keyword Search Bar', () => {
-  it('should have a search bar component at src/components/search-bar.tsx', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    expect(existsSync(searchPath)).toBe(true)
-  })
+// Mock lucide-react icons
+vi.mock("lucide-react", () => ({
+  Search: (props: Record<string, unknown>) => <div data-testid="search-icon" {...props} />,
+  X: (props: Record<string, unknown>) => <div data-testid="x-icon" {...props} />,
+  Loader2: (props: Record<string, unknown>) => <div data-testid="loader-icon" {...props} />,
+  Tag: (props: Record<string, unknown>) => <div data-testid="tag-icon" {...props} />,
+}));
 
-  it('should render a search input', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    const content = readFileSync(searchPath, 'utf-8')
+import { SearchBar } from "@/components/search-bar";
 
-    expect(content).toContain('Input')
-    expect(content).toContain('placeholder')
-    expect(content).toContain('Search')
-  })
+describe("T029 — Keyword Search Bar", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
 
-  it('should implement debounce logic with setTimeout', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    const content = readFileSync(searchPath, 'utf-8')
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-    expect(content).toContain('setTimeout')
-    expect(content).toContain('clearTimeout')
-    expect(content).toContain('300') // 300ms debounce
-  })
+  it("renders the search input with correct aria attributes", () => {
+    const onChange = vi.fn();
+    render(<SearchBar value="" onChange={onChange} placeholder="Search reels..." />);
 
-  it('should use a ref for the debounce timer', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    const content = readFileSync(searchPath, 'utf-8')
+    const input = screen.getByLabelText("Search reels");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute("role", "searchbox");
+    expect(input).toHaveAttribute("placeholder", "Search reels...");
+  });
 
-    expect(content).toContain('useRef')
-    expect(content).toContain('debounceTimerRef')
-  })
+  it("fires onChange after debounce delay when typing", () => {
+    const onChange = vi.fn();
+    render(<SearchBar value="" onChange={onChange} />);
 
-  it('should call onChange callback with debounced value', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    const content = readFileSync(searchPath, 'utf-8')
+    const input = screen.getByLabelText("Search reels");
+    fireEvent.change(input, { target: { value: "cooking" } });
 
-    expect(content).toContain('onChange')
-    expect(content).toContain('localValue')
-  })
+    // Should not fire immediately
+    expect(onChange).not.toHaveBeenCalled();
 
-  it('should support clearing the search input', () => {
-    const searchPath = resolve(srcDir, 'components/search-bar.tsx')
-    const content = readFileSync(searchPath, 'utf-8')
+    // Advance past debounce delay
+    vi.advanceTimersByTime(300);
 
-    expect(content).toContain('handleClear')
-    expect(content).toContain('Clear')
-  })
-})
+    expect(onChange).toHaveBeenCalledWith("cooking");
+  });
+
+  it("shows a clear button when input has value and clears it on click", () => {
+    const onChange = vi.fn();
+    render(<SearchBar value="some query" onChange={onChange} />);
+
+    const clearButton = screen.getByLabelText("Clear search");
+    expect(clearButton).toBeInTheDocument();
+
+    fireEvent.click(clearButton);
+
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("does not show clear button when value is empty", () => {
+    const onChange = vi.fn();
+    render(<SearchBar value="" onChange={onChange} />);
+
+    expect(screen.queryByLabelText("Clear search")).not.toBeInTheDocument();
+  });
+});

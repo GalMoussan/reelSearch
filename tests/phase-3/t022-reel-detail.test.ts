@@ -16,6 +16,12 @@ vi.mock('@/lib/prisma', () => ({
     reel: {
       findUnique: vi.fn(),
     },
+    reelView: {
+      upsert: vi.fn().mockResolvedValue({}),
+    },
+    reelNote: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
   },
 }))
 
@@ -55,6 +61,7 @@ describe('T022 — GET /api/reels/[id] (Reel Detail)', () => {
         { id: 't2', name: 'health' },
       ],
       addedBy: { id: 'u1', name: 'Test', image: null },
+      collections: [],
     }
     mockFindUnique.mockResolvedValue(mockReel as any)
 
@@ -80,6 +87,7 @@ describe('T022 — GET /api/reels/[id] (Reel Detail)', () => {
       status: 'DONE',
       tags: [],
       addedBy: { id: 'u1', name: 'Test', image: null },
+      collections: [],
     }
     mockFindUnique.mockResolvedValue(mockReel as any)
 

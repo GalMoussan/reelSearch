@@ -1,64 +1,151 @@
-import { describe, it, expect, vi } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const ROOT = resolve(__dirname, '../..')
+// Define APIError class that will be used both in the mock and in tests
+const { MockAPIError, mockCreate } = vi.hoisted(() => {
+  class MockAPIError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.name = "APIError";
+      this.status = status;
+    }
+  }
+  return { MockAPIError, mockCreate: vi.fn() };
+});
 
-describe('T012 — Claude Vision Analyzer', () => {
-  it('should export analyzeReel function from analyzer.ts', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    expect(existsSync(analyzerPath)).toBe(true)
-    const content = readFileSync(analyzerPath, 'utf-8')
-    expect(content).toContain('export')
-    expect(content).toContain('analyzeReel')
-  })
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: Object.assign(
+    vi.fn().mockImplementation(() => ({
+      messages: {
+        create: mockCreate,
+      },
+    })),
+    {
+      APIError: MockAPIError,
+    }
+  ),
+}));
 
-  it('should send images and transcript to Claude API', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    const content = readFileSync(analyzerPath, 'utf-8')
-    // Verify it calls anthropic.messages.create with image content blocks
-    expect(content).toContain('messages.create')
-    expect(content).toContain('type: "image"')
-    expect(content).toContain('source')
-    expect(content).toContain('base64')
-  })
+import { analyzeReel } from "@/services/analyzer";
 
-  it('should use the correct system prompt for reel analysis', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    const content = readFileSync(analyzerPath, 'utf-8')
-    // Verify the system prompt contains key instructions
-    expect(content).toContain('You are an expert visual content analyzer')
-    expect(content).toContain('"tags"')
-    expect(content).toContain('"summary"')
-    expect(content).toContain('"title"')
-    expect(content).toContain('"language"')
-    expect(content).toContain('Minimum 20 tags')
-  })
+const VALID_TAGS = [
+  "cooking",
+  "recipe",
+  "food",
+  "kitchen",
+  "tutorial",
+  "howto",
+  "chef",
+  "meal",
+  "dinner",
+  "lunch",
+  "breakfast",
+  "healthy",
+  "vegan",
+  "organic",
+  "homemade",
+  "delicious",
+  "trending",
+  "viral",
+  "foodie",
+  "plating",
+];
 
-  it('should validate response with Zod schema requiring 20+ tags', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    const content = readFileSync(analyzerPath, 'utf-8')
-    // Verify Zod schema enforces minimum 20 tags
-    expect(content).toContain('z.array(z.string()).min(20)')
-    expect(content).toContain('analysisSchema.safeParse')
-  })
+const VALID_RESPONSE = {
+  tags: VALID_TAGS,
+  summary: "A cooking tutorial showing how to make a healthy vegan meal.",
+  title: "Easy Vegan Dinner Recipe",
+  language: "en" as const,
+};
 
-  it('should retry on Claude API error with exponential backoff', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    const content = readFileSync(analyzerPath, 'utf-8')
-    // Verify retry logic exists
-    expect(content).toContain('MAX_RETRIES')
-    expect(content).toContain('isRetryableError')
-    expect(content).toMatch(/Math\.pow\(2,\s*attempt\)/)
-  })
+describe("T012 — Claude Vision Analyzer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-  it('should return AnalysisResult type with tags, summary, title, language', () => {
-    const analyzerPath = resolve(ROOT, 'src/services/analyzer.ts')
-    const content = readFileSync(analyzerPath, 'utf-8')
-    expect(content).toContain('AnalysisResult')
-    expect(content).toMatch(/tags:\s*z\.array/)
-    expect(content).toMatch(/summary:\s*z\.string/)
-    expect(content).toMatch(/title:\s*z\.string/)
-    expect(content).toMatch(/language:\s*z\.enum/)
-  })
-})
+  it("returns analysis with tags, summary, title, and language", async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify(VALID_RESPONSE) }],
+    });
+
+    const result = await analyzeReel(
+      ["base64frame1", "base64frame2"],
+      "Hello this is a cooking video",
+    );
+
+    expect(result.tags).toEqual(VALID_TAGS);
+    expect(result.summary).toBe(VALID_RESPONSE.summary);
+    expect(result.title).toBe(VALID_RESPONSE.title);
+    expect(result.language).toBe("en");
+    expect(mockCreate).toHaveBeenCalledOnce();
+  });
+
+  it("strips markdown code fences from response", async () => {
+    const wrappedJson =
+      "```json\n" + JSON.stringify(VALID_RESPONSE) + "\n```";
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: wrappedJson }],
+    });
+
+    const result = await analyzeReel(["frame1"], "transcript text");
+
+    expect(result.tags).toEqual(VALID_TAGS);
+    expect(result.title).toBe(VALID_RESPONSE.title);
+  });
+
+  it("throws validation error when fewer than 20 tags are returned", async () => {
+    const invalidResponse = {
+      tags: ["tag1", "tag2", "tag3", "tag4", "tag5"],
+      summary: "Short summary",
+      title: "Some Title",
+      language: "en",
+    };
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify(invalidResponse) }],
+    });
+
+    await expect(
+      analyzeReel(["frame1"], "transcript"),
+    ).rejects.toThrow();
+  });
+
+  it("throws descriptive error on invalid JSON response", async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "this is not valid json at all" }],
+    });
+
+    await expect(
+      analyzeReel(["frame1"], "transcript"),
+    ).rejects.toThrow();
+  });
+
+  it("retries on 429 rate limit errors", async () => {
+    const rateLimitError = new MockAPIError(429, "Rate limited");
+
+    mockCreate
+      .mockRejectedValueOnce(rateLimitError)
+      .mockResolvedValueOnce({
+        content: [{ type: "text", text: JSON.stringify(VALID_RESPONSE) }],
+      });
+
+    const result = await analyzeReel(["frame1"], "transcript");
+
+    expect(result.tags).toEqual(VALID_TAGS);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries on 5xx server errors", async () => {
+    const serverError = new MockAPIError(500, "Internal Server Error");
+
+    mockCreate
+      .mockRejectedValueOnce(serverError)
+      .mockResolvedValueOnce({
+        content: [{ type: "text", text: JSON.stringify(VALID_RESPONSE) }],
+      });
+
+    const result = await analyzeReel(["frame1"], "transcript");
+
+    expect(result.tags).toEqual(VALID_TAGS);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+});

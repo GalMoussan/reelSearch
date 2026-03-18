@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 
-import { authOptions } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
+import { rateLimit } from "@/lib/rate-limit"
 import { naturalLanguageSearch } from "@/services/nl-search"
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await requireAuth()
+
+    const { allowed } = await rateLimit(`rl:search-nl:${session.user.id}`, 20, 60)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      )
     }
 
     const body = await request.json()
@@ -26,6 +31,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     console.error("POST /api/search/nl error:", error)
     return NextResponse.json(
       { error: "Internal server error" },

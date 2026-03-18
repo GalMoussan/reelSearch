@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { addReelJob } from "@/lib/queue"
+import { rateLimit } from "@/lib/rate-limit"
 import { reelUrlSchema } from "@/lib/validators"
 import { fullTextSearch, semanticSearch } from "@/services/search"
 import { isEmbeddingEnabled } from "@/services/embedder"
@@ -83,7 +84,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      conditions.push({ status: status as "PENDING" | "PROCESSING" | "DONE" | "FAILED" })
+      const validStatuses = ["PENDING", "PROCESSING", "DONE", "FAILED"] as const
+      if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
+        return NextResponse.json(
+          { error: "Invalid status filter" },
+          { status: 400 },
+        )
+      }
+      conditions.push({ status: status as (typeof validStatuses)[number] })
     }
 
     if (collectionId) {
@@ -92,28 +100,28 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Hybrid search: FTS + semantic when q is provided
+    // Hybrid search: FTS + semantic + tag matching when q is provided
     let rankedIds: string[] | null = null
 
     if (q) {
-      // Run FTS (always) and semantic search (if embeddings enabled) in parallel
-      const searchPromises: [
-        Promise<Array<{ id: string }>>,
-        Promise<Array<{ id: string }>> | null,
-      ] = [
+      // Run FTS, semantic search, and tag search in parallel
+      const queryWords = q.toLowerCase().split(/\s+/).filter(Boolean)
+
+      const [ftsResults, semanticResults, tagResults] = await Promise.all([
         fullTextSearch(q, { limit: 100 }),
         isEmbeddingEnabled()
           ? semanticSearch(q, { limit: 50, threshold: 0.25 }).catch(() => [])
-          : null,
-      ]
-
-      const [ftsResults, semanticResults] = await Promise.all([
-        searchPromises[0],
-        searchPromises[1] ?? Promise.resolve([]),
+          : Promise.resolve([]),
+        prisma.reel.findMany({
+          where: {
+            tags: { some: { name: { in: queryWords } } },
+          },
+          select: { id: true },
+        }),
       ])
 
-      if (ftsResults.length > 0 || semanticResults.length > 0) {
-        // Reciprocal Rank Fusion (RRF) to merge FTS and semantic results
+      if (ftsResults.length > 0 || semanticResults.length > 0 || tagResults.length > 0) {
+        // Reciprocal Rank Fusion (RRF) to merge all three search legs
         const K = 60
         const scores = new Map<string, number>()
 
@@ -123,6 +131,9 @@ export async function GET(request: NextRequest) {
         semanticResults.forEach((r, rank) => {
           scores.set(r.id, (scores.get(r.id) ?? 0) + 1 / (K + rank))
         })
+        tagResults.forEach((r, rank) => {
+          scores.set(r.id, (scores.get(r.id) ?? 0) + 1 / (K + rank))
+        })
 
         rankedIds = [...scores.entries()]
           .sort((a, b) => b[1] - a[1])
@@ -130,7 +141,7 @@ export async function GET(request: NextRequest) {
 
         conditions.push({ id: { in: rankedIds } })
       } else {
-        // Both returned nothing — fall back to ILIKE
+        // All returned nothing — fall back to ILIKE
         conditions.push({
           OR: [
             { title: { contains: q, mode: "insensitive" } },
@@ -145,6 +156,7 @@ export async function GET(request: NextRequest) {
       conditions.length > 0 ? { AND: conditions } : {}
 
     const skip = (page - 1) * limit
+
 
     if (rankedIds) {
       // When hybrid search is active, paginate the ranked IDs first,
@@ -208,6 +220,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth()
     const userId = session.user.id
+
+    const { allowed } = await rateLimit(`rl:reels:${userId}`, 10, 60)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      )
+    }
 
     const body = await request.json()
     const result = reelUrlSchema.safeParse(body.url)

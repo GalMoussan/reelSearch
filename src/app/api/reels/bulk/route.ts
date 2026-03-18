@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { addReelJob } from "@/lib/queue"
+import { rateLimit } from "@/lib/rate-limit"
 import { reelUrlsSchema } from "@/lib/validators"
 
 interface BulkResult {
@@ -15,6 +16,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth()
     const userId = session.user.id
+
+    const { allowed } = await rateLimit(`rl:reels-bulk:${userId}`, 3, 60)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      )
+    }
 
     const body = await request.json()
     const parsed = reelUrlsSchema.safeParse(body.urls)

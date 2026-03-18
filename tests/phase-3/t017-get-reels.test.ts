@@ -32,11 +32,28 @@ vi.mock('@/lib/queue', () => ({
   addReelJob: vi.fn(),
 }))
 
+// Mock rate limiter
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9 }),
+}))
+
 // Mock validators
 vi.mock('@/lib/validators', () => ({
   reelUrlSchema: {
     safeParse: vi.fn(),
   },
+}))
+
+// Mock search services
+vi.mock('@/services/search', () => ({
+  fullTextSearch: vi.fn().mockResolvedValue([]),
+  semanticSearch: vi.fn().mockResolvedValue([]),
+}))
+
+// Mock embedder
+vi.mock('@/services/embedder', () => ({
+  isEmbeddingEnabled: vi.fn(() => false),
+  generateEmbedding: vi.fn(),
 }))
 
 import { NextRequest } from 'next/server'
@@ -75,7 +92,7 @@ describe('T017 — GET /api/reels', () => {
     expect(json.data).toHaveLength(1)
   })
 
-  it('should support tag filter via query param', async () => {
+  it('should support tag filter via query param (AND logic per tag)', async () => {
     mockFindMany.mockResolvedValue([])
     mockCount.mockResolvedValue(0)
 
@@ -85,19 +102,20 @@ describe('T017 — GET /api/reels', () => {
       expect.objectContaining({
         where: {
           AND: [
-            { tags: { some: { name: { in: ['fitness'] } } } },
+            { tags: { some: { name: 'fitness' } } },
           ],
         },
       }),
     )
   })
 
-  it('should support keyword search via q param', async () => {
+  it('should support keyword search via q param (ILIKE fallback)', async () => {
     mockFindMany.mockResolvedValue([])
     mockCount.mockResolvedValue(0)
 
     await GET(makeRequest('http://localhost/api/reels?q=recipe'))
 
+    // When FTS + semantic return nothing, falls back to ILIKE on title/summary/transcript
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -106,6 +124,7 @@ describe('T017 — GET /api/reels', () => {
               OR: [
                 { title: { contains: 'recipe', mode: 'insensitive' } },
                 { summary: { contains: 'recipe', mode: 'insensitive' } },
+                { transcript: { contains: 'recipe', mode: 'insensitive' } },
               ],
             },
           ],

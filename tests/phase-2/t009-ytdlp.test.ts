@@ -1,45 +1,148 @@
-import { describe, it, expect, vi } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const ROOT = resolve(__dirname, '../..')
+vi.mock("child_process", () => ({
+  execFile: vi.fn(),
+}));
 
-describe('T009 — yt-dlp Downloader', () => {
-  it('should export downloadReel function from downloader.ts', () => {
-    const downloaderPath = resolve(ROOT, 'src/services/downloader.ts')
-    expect(existsSync(downloaderPath)).toBe(true)
-    const content = readFileSync(downloaderPath, 'utf-8')
-    expect(content).toContain('export')
-    expect(content).toContain('downloadReel')
-  })
+vi.mock("fs/promises", () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue(Buffer.from("fake-image-data")),
+  readdir: vi.fn().mockResolvedValue(["video.mp4", "video.jpg"]),
+}));
 
-  it('should create a temp directory via mkdir', () => {
-    const downloaderPath = resolve(ROOT, 'src/services/downloader.ts')
-    const content = readFileSync(downloaderPath, 'utf-8')
-    // Verify it uses mkdir to create temp dir under /tmp/reelsearch
-    expect(content).toContain('mkdir')
-    expect(content).toContain('/tmp/reelsearch')
-  })
+vi.mock("@/lib/supabase", () => ({
+  uploadFile: vi.fn().mockResolvedValue("https://supabase.co/storage/thumb.jpg"),
+}));
 
-  it('should call yt-dlp with correct arguments', () => {
-    const downloaderPath = resolve(ROOT, 'src/services/downloader.ts')
-    const content = readFileSync(downloaderPath, 'utf-8')
-    expect(content).toContain('yt-dlp')
-    expect(content).toContain('"-o"')
-    expect(content).toContain('"--format"')
-  })
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    reel: {
+      update: vi.fn().mockResolvedValue({}),
+    },
+  },
+}));
 
-  it('should extract audio from the downloaded video', () => {
-    const downloaderPath = resolve(ROOT, 'src/services/downloader.ts')
-    const content = readFileSync(downloaderPath, 'utf-8')
-    expect(content).toContain('--extract-audio')
-    expect(content).toContain('mp3')
-  })
+import { downloadReel } from "@/services/downloader";
+import { execFile } from "child_process";
+import { mkdir, readdir } from "fs/promises";
+import { uploadFile } from "@/lib/supabase";
+import { prisma } from "@/lib/prisma";
 
-  it('should upload thumbnail to Supabase storage', () => {
-    const downloaderPath = resolve(ROOT, 'src/services/downloader.ts')
-    const content = readFileSync(downloaderPath, 'utf-8')
-    expect(content).toContain('uploadFile')
-    expect(content).toContain('thumbnails')
-  })
-})
+const mockedExecFile = vi.mocked(execFile);
+const mockedMkdir = vi.mocked(mkdir);
+const mockedReaddir = vi.mocked(readdir);
+const mockedUploadFile = vi.mocked(uploadFile);
+
+describe("T009 — yt-dlp Downloader", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockedExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[args.length - 1];
+      if (typeof cb === "function") {
+        (cb as (err: null, stdout: string, stderr: string) => void)(
+          null,
+          "",
+          "",
+        );
+      }
+      return undefined as never;
+    });
+
+    mockedReaddir.mockResolvedValue(
+      ["video.mp4", "video.jpg"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >,
+    );
+    mockedUploadFile.mockResolvedValue(
+      "https://supabase.co/storage/thumb.jpg",
+    );
+  });
+
+  it("creates temp directory with recursive:true", async () => {
+    await downloadReel("reel-123", "https://instagram.com/reel/123");
+
+    expect(mockedMkdir).toHaveBeenCalledWith(
+      expect.stringContaining("/tmp/reelsearch/reel-123"),
+      expect.objectContaining({ recursive: true }),
+    );
+  });
+
+  it("calls yt-dlp with correct arguments", async () => {
+    await downloadReel("reel-123", "https://instagram.com/reel/123");
+
+    const ytdlpCall = mockedExecFile.mock.calls.find(
+      (call) => typeof call[0] === "string" && call[0].includes("yt-dlp"),
+    );
+    expect(ytdlpCall).toBeDefined();
+
+    const args = ytdlpCall![1] as string[];
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining("reel-123"),
+        "--format",
+        "best[ext=mp4]/best",
+        "--write-thumbnail",
+        "--convert-thumbnails",
+        "jpg",
+        "https://instagram.com/reel/123",
+      ]),
+    );
+  });
+
+  it("calls ffmpeg for audio extraction", async () => {
+    await downloadReel("reel-123", "https://instagram.com/reel/123");
+
+    const ffmpegCall = mockedExecFile.mock.calls.find(
+      (call) => typeof call[0] === "string" && call[0].includes("ffmpeg"),
+    );
+    expect(ffmpegCall).toBeDefined();
+  });
+
+  it("returns correct videoPath and audioPath", async () => {
+    const result = await downloadReel(
+      "reel-123",
+      "https://instagram.com/reel/123",
+    );
+
+    expect(result).toHaveProperty("videoPath");
+    expect(result).toHaveProperty("audioPath");
+    expect(result.videoPath).toContain("reel-123");
+    expect(result.audioPath).toContain("reel-123");
+  });
+
+  it("uploads thumbnail when a thumb file exists in the directory", async () => {
+    const result = await downloadReel(
+      "reel-123",
+      "https://instagram.com/reel/123",
+    );
+
+    expect(mockedReaddir).toHaveBeenCalled();
+    expect(mockedUploadFile).toHaveBeenCalled();
+    expect(result.thumbnailUrl).toBe("https://supabase.co/storage/thumb.jpg");
+    expect(prisma.reel.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "reel-123" }),
+        data: expect.objectContaining({
+          thumbnailUrl: "https://supabase.co/storage/thumb.jpg",
+        }),
+      }),
+    );
+  });
+
+  it("handles missing thumbnail gracefully", async () => {
+    mockedReaddir.mockResolvedValue(
+      ["video.mp4"] as unknown as Awaited<ReturnType<typeof readdir>>,
+    );
+
+    const result = await downloadReel(
+      "reel-123",
+      "https://instagram.com/reel/123",
+    );
+
+    expect(result).toHaveProperty("videoPath");
+    expect(result).toHaveProperty("audioPath");
+    expect(mockedUploadFile).not.toHaveBeenCalled();
+  });
+});

@@ -1,63 +1,100 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Mock OpenAI before importing
-vi.mock('openai', () => {
-  const mockCreate = vi.fn()
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      audio: {
-        transcriptions: {
-          create: mockCreate,
-        },
+const mockCreate = vi.fn();
+
+vi.mock("openai", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    audio: {
+      transcriptions: {
+        create: mockCreate,
       },
-    })),
-    __mockCreate: mockCreate,
-  }
-})
+    },
+  })),
+}));
 
-// Mock fs.createReadStream so it doesn't try to open real files
-vi.mock('fs', async (importOriginal) => {
-  const original = await importOriginal<typeof import('fs')>()
+vi.mock("fs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("fs")>();
   return {
     ...original,
-    createReadStream: vi.fn().mockReturnValue('mock-stream'),
-  }
-})
+    createReadStream: vi.fn().mockReturnValue("mock-stream"),
+  };
+});
 
-const ROOT = resolve(__dirname, '../..')
+import { transcribe } from "@/services/transcriber";
 
-describe('T010 — Whisper Transcription', () => {
-  it('should export transcribe function from transcriber.ts', () => {
-    const transcriberPath = resolve(ROOT, 'src/services/transcriber.ts')
-    expect(existsSync(transcriberPath)).toBe(true)
-    const content = readFileSync(transcriberPath, 'utf-8')
-    expect(content).toContain('export')
-    expect(content).toContain('transcribe')
-  })
+describe("T010 — Whisper Transcription", () => {
+  const originalEnv = process.env.OPENAI_API_KEY;
 
-  it('should call Whisper API with whisper-1 model', () => {
-    const transcriberPath = resolve(ROOT, 'src/services/transcriber.ts')
-    const content = readFileSync(transcriberPath, 'utf-8')
-    expect(content).toContain('whisper-1')
-    expect(content).toContain('audio.transcriptions.create')
-  })
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.OPENAI_API_KEY = "test-api-key";
+  });
 
-  it('should return transcript text and detected language', () => {
-    const transcriberPath = resolve(ROOT, 'src/services/transcriber.ts')
-    const content = readFileSync(transcriberPath, 'utf-8')
-    // Verify return shape includes text and language
-    expect(content).toContain('TranscriptionResult')
-    expect(content).toMatch(/text:\s*/)
-    expect(content).toMatch(/language:\s*/)
-  })
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.OPENAI_API_KEY = originalEnv;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+  });
 
-  it('should handle no-speech audio gracefully', () => {
-    const transcriberPath = resolve(ROOT, 'src/services/transcriber.ts')
-    const content = readFileSync(transcriberPath, 'utf-8')
-    // Verify it handles no-speech case
-    expect(content).toContain('no speech')
-    expect(content).toContain('language: "none"')
-  })
-})
+  it("returns transcript text and mapped language for English", async () => {
+    mockCreate.mockResolvedValue({
+      text: "Hello world, this is a test video.",
+      language: "english",
+    });
+
+    const result = await transcribe("/tmp/audio.mp3");
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "whisper-1",
+        response_format: "verbose_json",
+      }),
+    );
+    expect(result.text).toBe("Hello world, this is a test video.");
+    expect(result.language).toBe("en");
+  });
+
+  it("maps Hebrew language correctly", async () => {
+    mockCreate.mockResolvedValue({
+      text: "שלום עולם",
+      language: "hebrew",
+    });
+
+    const result = await transcribe("/tmp/audio.mp3");
+
+    expect(result.text).toBe("שלום עולם");
+    expect(result.language).toBe("he");
+  });
+
+  it("maps unknown languages to 'none'", async () => {
+    mockCreate.mockResolvedValue({
+      text: "some text",
+      language: "klingon",
+    });
+
+    const result = await transcribe("/tmp/audio.mp3");
+
+    expect(result.language).toBe("none");
+  });
+
+  it("handles 'no speech' error gracefully", async () => {
+    mockCreate.mockRejectedValue(new Error("no speech detected"));
+
+    const result = await transcribe("/tmp/audio.mp3");
+
+    expect(result.text).toBe("");
+    expect(result.language).toBe("none");
+  });
+
+  it("returns early with empty result when API key is not set", async () => {
+    delete process.env.OPENAI_API_KEY;
+
+    const result = await transcribe("/tmp/audio.mp3");
+
+    expect(result.text).toBe("");
+    expect(result.language).toBe("none");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+});

@@ -10,16 +10,29 @@ vi.mock('@/lib/auth', () => ({
   authOptions: {},
 }))
 
+// Mock auth utils
+vi.mock('@/lib/auth-utils', () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    user: { id: 'user-123', name: 'Test', email: 'test@test.com' },
+    expires: '2099-01-01',
+  }),
+}))
+
+// Mock rate limiter
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 29 }),
+}))
+
 // Mock the search service
 vi.mock('@/services/search', () => ({
   semanticSearch: vi.fn(),
 }))
 
-import { getServerSession } from 'next-auth'
+import { requireAuth } from '@/lib/auth-utils'
 import { semanticSearch } from '@/services/search'
 import { POST } from '@/app/api/search/semantic/route'
 
-const mockGetServerSession = vi.mocked(getServerSession)
+const mockRequireAuth = vi.mocked(requireAuth)
 const mockSemanticSearch = vi.mocked(semanticSearch)
 
 function makePostRequest(body: Record<string, unknown>) {
@@ -33,7 +46,10 @@ function makePostRequest(body: Record<string, unknown>) {
 describe('T020 — Semantic Search API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetServerSession.mockResolvedValue({ user: { id: 'u1', name: 'Test' } })
+    mockRequireAuth.mockResolvedValue({
+      user: { id: 'u1', name: 'Test', email: 'test@test.com' },
+      expires: '2099-01-01',
+    })
   })
 
   it('should accept query text via POST /api/search/semantic', async () => {
@@ -80,7 +96,7 @@ describe('T020 — Semantic Search API', () => {
   })
 
   it('should return 401 for unauthenticated requests', async () => {
-    mockGetServerSession.mockResolvedValue(null)
+    mockRequireAuth.mockRejectedValue(new Error('Unauthorized'))
 
     const response = await POST(makePostRequest({ query: 'test' }))
 

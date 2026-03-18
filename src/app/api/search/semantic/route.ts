@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 
-import { authOptions } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
+import { rateLimit } from "@/lib/rate-limit"
 import { semanticSearch } from "@/services/search"
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await requireAuth()
+
+    const { allowed } = await rateLimit(`rl:search-semantic:${session.user.id}`, 30, 60)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 },
+      )
     }
 
     const body = await request.json()
@@ -37,6 +42,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: results })
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     console.error("POST /api/search/semantic error:", error)
     return NextResponse.json(
       { error: "Internal server error" },

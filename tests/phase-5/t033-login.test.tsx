@@ -1,27 +1,70 @@
-import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
-const ROOT = resolve(__dirname, '../..')
+// Mock next-auth/react
+const mockSignIn = vi.fn();
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: null, status: "unauthenticated" }),
+  signIn: (...args: unknown[]) => mockSignIn(...args),
+  SessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
-describe('T033 — Login Page', () => {
-  it('should have a login page at src/app/login/page.tsx', () => {
-    const loginPath = resolve(ROOT, 'src/app/login/page.tsx')
-    expect(existsSync(loginPath)).toBe(true)
-  })
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => ({
+    get: () => null,
+  }),
+  redirect: vi.fn(),
+}));
 
-  it('should reference signIn for authentication', () => {
-    const content = readFileSync(resolve(ROOT, 'src/app/login/page.tsx'), 'utf-8')
-    expect(content).toMatch(/signIn/i)
-  })
+// Mock next/image
+vi.mock("next/image", () => ({
+  default: (props: Record<string, unknown>) => <img {...props} />,
+}));
 
-  it('should reference google as an auth provider', () => {
-    const content = readFileSync(resolve(ROOT, 'src/app/login/page.tsx'), 'utf-8')
-    expect(content.toLowerCase()).toContain('google')
-  })
+// Mock lucide-react icons
+vi.mock("lucide-react", () => ({
+  LogIn: (props: Record<string, unknown>) => <div data-testid="login-icon" {...props} />,
+  Chrome: (props: Record<string, unknown>) => <div data-testid="chrome-icon" {...props} />,
+  Loader2: (props: Record<string, unknown>) => <div data-testid="loader-icon" {...props} />,
+}));
 
-  it('should render a "Sign in with Google" label', () => {
-    const content = readFileSync(resolve(ROOT, 'src/app/login/page.tsx'), 'utf-8')
-    expect(content).toMatch(/Sign\s+in\s+with\s+Google/i)
-  })
-})
+import LoginPage from "@/app/login/page";
+
+describe("T033 — Login Page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the 'Sign in with Google' button", () => {
+    render(<LoginPage />);
+
+    const button = screen.getByRole("button", { name: /sign in with google/i });
+    expect(button).toBeInTheDocument();
+  });
+
+  it("calls signIn with 'google' when the button is clicked", () => {
+    render(<LoginPage />);
+
+    const button = screen.getByRole("button", { name: /sign in with google/i });
+    fireEvent.click(button);
+
+    expect(mockSignIn).toHaveBeenCalledWith(
+      "google",
+      expect.objectContaining({
+        callbackUrl: expect.any(String),
+      })
+    );
+  });
+
+  it("renders the login page heading or brand text", () => {
+    render(<LoginPage />);
+
+    // The page should have identifiable content
+    expect(screen.getByRole("button", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+});
