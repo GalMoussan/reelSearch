@@ -69,7 +69,7 @@ export async function GET(
     return NextResponse.json({
       data: {
         ...reel,
-        collections: reel.collections.map((cr) => cr.collection),
+        collections: reel.collections.map((cr: (typeof reel.collections)[number]) => cr.collection),
         note: note?.content ?? null,
       },
     })

@@ -21,7 +21,7 @@ export async function GET() {
       orderBy: { reels: { _count: "desc" } },
     })
 
-    const transformedTags = tags.map((tag) => ({
+    const transformedTags = tags.map((tag: (typeof tags)[number]) => ({
       id: tag.id,
       name: tag.name,
       count: tag._count.reels,

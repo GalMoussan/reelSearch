@@ -20,7 +20,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     })
 
-    const data = collections.map((c) => ({
+    const data = collections.map((c: (typeof collections)[number]) => ({
       id: c.id,
       name: c.name,
       description: c.description,
