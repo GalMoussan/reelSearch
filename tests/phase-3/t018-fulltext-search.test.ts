@@ -14,10 +14,11 @@ vi.mock('@/services/embedder', () => ({
   generateEmbedding: vi.fn(),
 }))
 
-// Mock Prisma namespace for Prisma.sql tagged template
+// Mock Prisma namespace for Prisma.sql and Prisma.raw tagged templates
 vi.mock('@prisma/client', () => ({
   Prisma: {
     sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
+    raw: (value: string) => ({ __prisma_raw: value }),
   },
 }))
 

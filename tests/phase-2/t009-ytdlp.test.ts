@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("child_process", () => ({
-  execFile: vi.fn(),
+vi.mock("@/lib/exec", () => ({
+  execText: vi.fn().mockResolvedValue(""),
 }));
 
 vi.mock("fs/promises", () => ({
@@ -23,12 +23,12 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { downloadReel } from "@/services/downloader";
-import { execFile } from "child_process";
+import { execText } from "@/lib/exec";
 import { mkdir, readdir } from "fs/promises";
 import { uploadFile } from "@/lib/supabase";
 import { prisma } from "@/lib/prisma";
 
-const mockedExecFile = vi.mocked(execFile);
+const mockedExecText = vi.mocked(execText);
 const mockedMkdir = vi.mocked(mkdir);
 const mockedReaddir = vi.mocked(readdir);
 const mockedUploadFile = vi.mocked(uploadFile);
@@ -37,17 +37,7 @@ describe("T009 — yt-dlp Downloader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockedExecFile.mockImplementation((...args: unknown[]) => {
-      const cb = args[args.length - 1];
-      if (typeof cb === "function") {
-        (cb as (err: null, stdout: string, stderr: string) => void)(
-          null,
-          "",
-          "",
-        );
-      }
-      return undefined as never;
-    });
+    mockedExecText.mockResolvedValue("");
 
     mockedReaddir.mockResolvedValue(
       ["video.mp4", "video.jpg"] as unknown as Awaited<
@@ -71,8 +61,8 @@ describe("T009 — yt-dlp Downloader", () => {
   it("calls yt-dlp with correct arguments", async () => {
     await downloadReel("reel-123", "https://instagram.com/reel/123");
 
-    const ytdlpCall = mockedExecFile.mock.calls.find(
-      (call) => typeof call[0] === "string" && call[0].includes("yt-dlp"),
+    const ytdlpCall = mockedExecText.mock.calls.find(
+      (call) => call[0] === "yt-dlp",
     );
     expect(ytdlpCall).toBeDefined();
 
@@ -82,10 +72,11 @@ describe("T009 — yt-dlp Downloader", () => {
         "-o",
         expect.stringContaining("reel-123"),
         "--format",
-        "best[ext=mp4]/best",
+        "best[ext=mp4]/bestvideo+bestaudio/best",
+        "--merge-output-format",
+        "mp4",
         "--write-thumbnail",
-        "--convert-thumbnails",
-        "jpg",
+        "--no-playlist",
         "https://instagram.com/reel/123",
       ]),
     );
@@ -94,8 +85,8 @@ describe("T009 — yt-dlp Downloader", () => {
   it("calls ffmpeg for audio extraction", async () => {
     await downloadReel("reel-123", "https://instagram.com/reel/123");
 
-    const ffmpegCall = mockedExecFile.mock.calls.find(
-      (call) => typeof call[0] === "string" && call[0].includes("ffmpeg"),
+    const ffmpegCall = mockedExecText.mock.calls.find(
+      (call) => call[0] === "ffmpeg",
     );
     expect(ffmpegCall).toBeDefined();
   });

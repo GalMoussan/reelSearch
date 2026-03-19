@@ -14,6 +14,8 @@
     "db:studio": "prisma studio",
     "worker": "npx tsx src/workers/reel-processor.ts",
     "worker:dev": "npx tsx --watch src/workers/reel-processor.ts",
+    "telegram": "npx tsx src/telegram/bot.ts",
+    "telegram:dev": "npx tsx --watch src/telegram/bot.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -45,6 +47,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.0.1",
+    "telegraf": "^4.16.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {

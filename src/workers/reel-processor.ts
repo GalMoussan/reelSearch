@@ -1,8 +1,8 @@
-import "dotenv/config"
 import { config } from "dotenv"
 config({ path: ".env.local", override: true })
 
 import { Worker, Job } from "bullmq"
+import { checkToolVersions } from "./check-tools"
 import { prisma } from "../lib/prisma"
 import { downloadReel } from "../services/downloader"
 import { transcribe } from "../services/transcriber"
@@ -58,22 +58,22 @@ async function processReel(job: Job<ReelJobData>) {
     const analysis = await analyzeReel(frames, transcription.text)
     await job.updateProgress(70)
 
-    // 5. Normalize tags + store metadata, and generate embeddings IN PARALLEL
+    // 5. Normalize tags + store metadata first, then generate embeddings (tags included)
     await setStep(reelId, "saving")
-    await Promise.all([
-      normalizeTags(reelId, analysis.tags, {
-        title: analysis.title,
-        summary: analysis.summary,
-        transcript: transcription.text,
-        language: analysis.language,
-      }),
-      embedAndStore(
-        reelId,
-        [analysis.title, analysis.summary, transcription.text?.slice(0, 2000)]
-          .filter(Boolean)
-          .join("\n"),
-      ),
-    ])
+    await normalizeTags(reelId, analysis.tags, {
+      title: analysis.title,
+      summary: analysis.summary,
+      transcript: transcription.text,
+      language: analysis.language,
+    })
+
+    const tagNames = analysis.tags.join(" ")
+    await embedAndStore(
+      reelId,
+      [analysis.title, analysis.summary, transcription.text?.slice(0, 2000), tagNames]
+        .filter(Boolean)
+        .join("\n"),
+    )
     await job.updateProgress(90)
 
     // 6. Cleanup and mark done
@@ -138,4 +138,7 @@ async function shutdown() {
 process.on("SIGTERM", shutdown)
 process.on("SIGINT", shutdown)
 
-console.log("[Worker] Started, waiting for jobs...")
+;(async () => {
+  await checkToolVersions()
+  console.log("[Worker] Started, waiting for jobs...")
+})()

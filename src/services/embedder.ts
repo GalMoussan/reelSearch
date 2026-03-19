@@ -1,11 +1,12 @@
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
+import { env } from "@/lib/env"
 import { Prisma } from "@prisma/client"
 
 const EMBEDDING_MODEL = "text-embedding-3-small"
 
 function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return new OpenAI({ apiKey: env.OPENAI_API_KEY })
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -34,8 +35,8 @@ export async function storeEmbedding(
 
 export function isEmbeddingEnabled(): boolean {
   return Boolean(
-    process.env.OPENAI_API_KEY &&
-      process.env.OPENAI_API_KEY !== "sk-your-openai-key",
+    env.OPENAI_API_KEY &&
+      env.OPENAI_API_KEY !== "sk-your-openai-key",
   )
 }
 

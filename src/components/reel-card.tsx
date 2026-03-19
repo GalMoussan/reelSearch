@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react"
 import Image from "next/image"
-import { Film, RotateCcw } from "lucide-react"
+import { Film, Loader2, RotateCcw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
@@ -80,6 +80,7 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
   const visibleTags = reel.tags.slice(0, MAX_VISIBLE_TAGS)
   const remainingCount = reel.tags.length - MAX_VISIBLE_TAGS
   const showStatusBadge = reel.status !== "DONE"
+  const isProcessing = reel.status === "PENDING" || reel.status === "PROCESSING"
   const isFailed = reel.status === "FAILED"
 
   function handleClick() {
@@ -122,7 +123,12 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
     >
       {/* Thumbnail */}
       <div className="relative aspect-video w-full bg-muted">
-        {reel.thumbnailUrl ? (
+        {isProcessing ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="text-sm font-medium text-primary">Processing video…</span>
+          </div>
+        ) : reel.thumbnailUrl ? (
           <Image
             src={reel.thumbnailUrl}
             alt={reel.title ?? "Reel thumbnail"}
@@ -139,7 +145,7 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
         {showStatusBadge && (
           <Badge
             className={cn(
-              "absolute right-2 top-2",
+              "absolute right-2 top-2 z-20",
               STATUS_STYLES[reel.status] ?? "bg-gray-100 text-gray-800 border-gray-200"
             )}
           >
@@ -175,7 +181,9 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
           {reel.title
             ? highlightText(reel.title, highlightTerms)
-            : "Untitled Reel"}
+            : isProcessing
+              ? "Brewing something great…"
+              : "Untitled Reel"}
         </h3>
 
         {/* Summary */}

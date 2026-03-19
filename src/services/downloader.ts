@@ -1,6 +1,7 @@
-import { execFile } from "child_process"
+import { existsSync } from "fs"
 import { mkdir, readFile, readdir } from "fs/promises"
 import path from "path"
+import { execText } from "@/lib/exec"
 import { prisma } from "@/lib/prisma"
 import { uploadFile } from "@/lib/supabase"
 
@@ -11,22 +12,6 @@ export type DownloadResult = {
 }
 
 const TEMP_BASE = "/tmp/reelsearch"
-
-function exec(command: string, args: string[], timeoutMs = 120_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, { timeout: timeoutMs }, (error, stdout, stderr) => {
-      if (error) {
-        reject(
-          new Error(
-            `${command} failed: ${error.message}\nstderr: ${stderr}\nstdout: ${stdout}`
-          )
-        )
-        return
-      }
-      resolve(stdout)
-    })
-  })
-}
 
 export async function downloadReel(
   reelId: string,
@@ -39,17 +24,25 @@ export async function downloadReel(
   const audioPath = path.join(tempDir, "audio.mp3")
   const thumbBase = path.join(tempDir, "thumb")
 
+  // Skip download if files are pre-staged (e.g. Telegram upload)
+  if (existsSync(videoPath) && existsSync(audioPath)) {
+    console.log(`[Downloader] Files pre-staged for ${reelId}, skipping yt-dlp`)
+    return { videoPath, audioPath, thumbnailUrl: "" }
+  }
+
   // Single yt-dlp call: download video + thumbnail together
-  await exec("yt-dlp", [
+  // Use bestvideo+bestaudio with mp4 merge for sites that only offer DASH/HLS (Reddit, X)
+  await execText("yt-dlp", [
     "-o", videoPath,
-    "--format", "best[ext=mp4]/best",
+    "--format", "best[ext=mp4]/bestvideo+bestaudio/best",
+    "--merge-output-format", "mp4",
     "--write-thumbnail",
-    "--convert-thumbnails", "jpg",
+    "--no-playlist",
     url,
   ])
 
   // Extract audio locally with ffmpeg (much faster than re-downloading)
-  await exec("ffmpeg", [
+  await execText("ffmpeg", [
     "-i", videoPath,
     "-vn",
     "-acodec", "libmp3lame",

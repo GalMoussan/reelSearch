@@ -1,8 +1,9 @@
 import { Queue } from "bullmq"
+import { env } from "./env"
 
 export const reelQueue = new Queue("reel-processing", {
   connection: {
-    url: process.env.REDIS_URL,
+    url: env.REDIS_URL,
     maxRetriesPerRequest: null,
   },
   defaultJobOptions: {

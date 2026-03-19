@@ -1,16 +1,12 @@
 import IORedis from "ioredis"
+import { env } from "./env"
 
 const globalForRedis = globalThis as unknown as {
   redis: IORedis | undefined
 }
 
 function createRedisConnection() {
-  const url = process.env.REDIS_URL
-  if (!url) {
-    throw new Error("REDIS_URL environment variable is required")
-  }
-
-  const connection = new IORedis(url, {
+  const connection = new IORedis(env.REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
   })

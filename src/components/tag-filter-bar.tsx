@@ -32,6 +32,27 @@ export function TagFilterBar({ selectedTags, onTagsChange }: TagFilterBarProps) 
 
   return (
     <div className="space-y-2">
+      {/* All selected tags shown prominently for easy removal */}
+      {selectedTags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedTags.map((name) => (
+            <button
+              key={name}
+              onClick={() => handleTagClick(name)}
+              className="flex-shrink-0 focus:outline-none"
+            >
+              <Badge
+                variant="default"
+                className="cursor-pointer transition-colors hover:bg-primary/80"
+              >
+                {name}
+                <X className="ml-1 h-3 w-3" />
+              </Badge>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Scrollable tag container */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {isLoading

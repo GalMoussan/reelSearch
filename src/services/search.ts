@@ -32,6 +32,47 @@ function sanitizeTsQuery(query: string): string {
 }
 
 /**
+ * Run a full-text search query against Reel content using the specified
+ * PostgreSQL text-search dictionary.
+ */
+function ftsQuery(
+  dictionary: "english" | "simple",
+  tsQuery: string,
+  limit: number,
+  offset: number,
+): ReturnType<typeof prisma.$queryRaw<SearchResult[]>> {
+  // Prisma.sql doesn't support interpolating identifiers, so we use
+  // Prisma.raw for the dictionary name (a fixed literal, not user input).
+  const dict = Prisma.raw(`'${dictionary}'`)
+
+  return prisma.$queryRaw<SearchResult[]>(
+    Prisma.sql`
+      SELECT
+        r."id",
+        r."url",
+        r."title",
+        r."summary",
+        r."thumbnailUrl",
+        ts_rank(
+          to_tsvector(${dict},
+            COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')
+            || ' ' || COALESCE((SELECT string_agg(t."name", ' ') FROM "_ReelToTag" rt JOIN "Tag" t ON t.id = rt."B" WHERE rt."A" = r.id), '')
+          ),
+          to_tsquery(${dict}, ${tsQuery})
+        ) AS rank
+      FROM "Reel" r
+      WHERE to_tsvector(${dict},
+            COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')
+            || ' ' || COALESCE((SELECT string_agg(t."name", ' ') FROM "_ReelToTag" rt JOIN "Tag" t ON t.id = rt."B" WHERE rt."A" = r.id), '')
+          )
+        @@ to_tsquery(${dict}, ${tsQuery})
+      ORDER BY rank DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `,
+  )
+}
+
+/**
  * Full-text search over Reel transcript and summary fields.
  * Uses PostgreSQL tsvector/tsquery with the 'english' dictionary first,
  * falling back to 'simple' (useful for Hebrew and other non-English content).
@@ -48,53 +89,13 @@ export async function fullTextSearch(
     return []
   }
 
-  // Try English dictionary first
-  const englishResults = await prisma.$queryRaw<SearchResult[]>(
-    Prisma.sql`
-      SELECT
-        r."id",
-        r."url",
-        r."title",
-        r."summary",
-        r."thumbnailUrl",
-        ts_rank(
-          to_tsvector('english', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
-          to_tsquery('english', ${tsQuery})
-        ) AS rank
-      FROM "Reel" r
-      WHERE to_tsvector('english', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
-        @@ to_tsquery('english', ${tsQuery})
-      ORDER BY rank DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `,
-  )
+  const englishResults = await ftsQuery("english", tsQuery, limit, offset)
 
   if (englishResults.length > 0) {
     return englishResults
   }
 
-  // Fallback to 'simple' dictionary for Hebrew / non-English support
-  const simpleResults = await prisma.$queryRaw<SearchResult[]>(
-    Prisma.sql`
-      SELECT
-        r."id",
-        r."url",
-        r."title",
-        r."summary",
-        r."thumbnailUrl",
-        ts_rank(
-          to_tsvector('simple', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", '')),
-          to_tsquery('simple', ${tsQuery})
-        ) AS rank
-      FROM "Reel" r
-      WHERE to_tsvector('simple', COALESCE(r."title", '') || ' ' || COALESCE(r."transcript", '') || ' ' || COALESCE(r."summary", ''))
-        @@ to_tsquery('simple', ${tsQuery})
-      ORDER BY rank DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `,
-  )
-
-  return simpleResults
+  return ftsQuery("simple", tsQuery, limit, offset)
 }
 
 /**

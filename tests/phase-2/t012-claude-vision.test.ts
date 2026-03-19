@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("@/lib/env", () => ({
+  env: new Proxy({} as Record<string, string>, {
+    get(_, prop: string) {
+      return process.env[prop] ?? "";
+    },
+  }),
+}));
+
 // Define APIError class that will be used both in the mock and in tests
 const { MockAPIError, mockCreate } = vi.hoisted(() => {
   class MockAPIError extends Error {

@@ -16,7 +16,7 @@ const PLATFORM_REGEXES = [
   /^(?:https?:\/\/)?v\.redd\.it\/[\w]+\/?$/,
 ]
 
-function isValidReelUrl(url: string): boolean {
+export function isValidReelUrl(url: string): boolean {
   return PLATFORM_REGEXES.some((regex) => regex.test(url))
 }
 
@@ -49,4 +49,9 @@ export const addReelToCollectionSchema = z.object({
 
 export const reelNoteSchema = z.object({
   content: z.string().max(5000, "Note must be 5000 characters or less"),
+})
+
+export const semanticSearchSchema = z.object({
+  query: z.string().trim().min(1, "query is required and must be a non-empty string"),
+  limit: z.number().int().min(1).max(50).optional().default(10),
 })

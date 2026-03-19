@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockEmbeddingsCreate = vi.fn();
 
+vi.mock("@/lib/env", () => ({
+  env: new Proxy({} as Record<string, string>, {
+    get(_, prop: string) {
+      return process.env[prop] ?? "";
+    },
+  }),
+}));
+
 vi.mock("openai", () => ({
   default: vi.fn().mockImplementation(() => ({
     embeddings: {

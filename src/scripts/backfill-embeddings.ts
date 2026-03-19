@@ -18,11 +18,12 @@ async function main() {
     process.exit(1)
   }
 
-  const reels = await prisma.$queryRaw<Array<{ id: string; title: string | null; summary: string | null; transcript: string | null }>>`
-    SELECT id, title, summary, transcript
-    FROM "Reel"
-    WHERE embedding IS NULL AND status = 'DONE'
-    ORDER BY "createdAt" DESC
+  const reels = await prisma.$queryRaw<Array<{ id: string; title: string | null; summary: string | null; transcript: string | null; tagNames: string | null }>>`
+    SELECT r.id, r.title, r.summary, r.transcript,
+      (SELECT string_agg(t."name", ' ') FROM "_ReelToTag" rt JOIN "Tag" t ON t.id = rt."B" WHERE rt."A" = r.id) AS "tagNames"
+    FROM "Reel" r
+    WHERE r.embedding IS NULL AND r.status = 'DONE'
+    ORDER BY r."createdAt" DESC
   `
 
   console.log(`[Backfill] Found ${reels.length} reels without embeddings`)
@@ -32,7 +33,7 @@ async function main() {
 
   for (let i = 0; i < reels.length; i++) {
     const reel = reels[i]
-    const text = [reel.title, reel.summary, reel.transcript?.slice(0, 2000)]
+    const text = [reel.title, reel.summary, reel.transcript?.slice(0, 2000), reel.tagNames]
       .filter(Boolean)
       .join("\n")
 

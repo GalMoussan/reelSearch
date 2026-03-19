@@ -6,6 +6,7 @@ import { ReelCard } from "@/components/reel-card"
 import ReelCardSkeleton from "@/components/reel-card-skeleton"
 import { EmptyState } from "@/components/empty-state"
 import { cn } from "@/lib/utils"
+import { Loader2 } from "lucide-react"
 
 interface ReelGridProps {
   tags?: string[]
@@ -40,6 +41,7 @@ export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collecti
     isError,
     error,
     hasNextPage,
+    isFetching,
     isFetchingNextPage,
     fetchNextPage,
   } = useReels({ tags, q, language, dateFrom, dateTo, status, collectionId, initialData })
@@ -73,10 +75,16 @@ export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collecti
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <ReelCardSkeleton key={i} />
-        ))}
+      <div>
+        <div className="flex items-center justify-center gap-2 py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Loading results…</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <ReelCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -119,19 +127,31 @@ export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collecti
         </p>
       )}
 
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+      <div className="relative">
+        {isFetching && !isLoading && !isFetchingNextPage && (
+          <div className="absolute inset-0 z-10 flex items-start justify-center bg-background/60 pt-24">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Loading results…</span>
+            </div>
+          </div>
         )}
-      >
-        {allReels.map((reel) => (
-          <ReelCard
-            key={reel.id}
-            reel={reel}
-            onClick={handleReelClick}
-            highlightTerms={highlightTerms}
-          />
-        ))}
+
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            isFetching && !isLoading && !isFetchingNextPage && "pointer-events-none",
+          )}
+        >
+          {allReels.map((reel) => (
+            <ReelCard
+              key={reel.id}
+              reel={reel}
+              onClick={handleReelClick}
+              highlightTerms={highlightTerms}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Sentinel element for infinite scroll */}

@@ -1,62 +1,7 @@
-import { execFile } from "child_process"
+import { execBuffer, execText } from "@/lib/exec"
 
-type ExecResult = {
-  stdout: Buffer
-  stderr: string
-}
-
-function execBuffer(
-  command: string,
-  args: string[],
-  timeoutMs = 30_000
-): Promise<ExecResult> {
-  return new Promise((resolve, reject) => {
-    const proc = execFile(
-      command,
-      args,
-      { timeout: timeoutMs, encoding: "buffer", maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(
-            new Error(
-              `${command} failed: ${error.message}\nstderr: ${stderr?.toString() ?? ""}`
-            )
-          )
-          return
-        }
-        resolve({
-          stdout: stdout as Buffer,
-          stderr: stderr?.toString() ?? "",
-        })
-      }
-    )
-  })
-}
-
-function execText(
-  command: string,
-  args: string[],
-  timeoutMs = 15_000
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      command,
-      args,
-      { timeout: timeoutMs },
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(
-            new Error(
-              `${command} failed: ${error.message}\nstderr: ${stderr}`
-            )
-          )
-          return
-        }
-        resolve(stdout.trim())
-      }
-    )
-  })
-}
+const MIN_DURATION_S = 1
+const SHORT_VIDEO_THRESHOLD_S = 5
 
 async function getVideoDuration(videoPath: string): Promise<number> {
   const output = await execText("ffprobe", [
@@ -102,11 +47,11 @@ function calculateTimestamps(duration: number, count: number): number[] {
 }
 
 function determineFrameCount(duration: number, requestedCount: number): number {
-  if (duration < 1) {
+  if (duration < MIN_DURATION_S) {
     return 1
   }
 
-  if (duration < 5) {
+  if (duration < SHORT_VIDEO_THRESHOLD_S) {
     // For short videos, scale proportionally: 1 frame per second, minimum 1
     return Math.max(1, Math.floor(duration))
   }

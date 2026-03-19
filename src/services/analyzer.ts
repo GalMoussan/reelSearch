@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
+import { env } from "@/lib/env"
 
 function getAnthropic() {
   return new Anthropic()
@@ -77,7 +78,7 @@ async function callWithRetry(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await getAnthropic().messages.create({
-        model: process.env.ANALYZER_MODEL ?? "claude-haiku-4-5-20251001",
+        model: env.ANALYZER_MODEL,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],

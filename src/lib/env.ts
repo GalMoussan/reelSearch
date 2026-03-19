@@ -17,10 +17,15 @@ const envSchema = z.object({
   // AI APIs
   OPENAI_API_KEY: z.string().optional().default(""),
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
+  ANALYZER_MODEL: z.string().optional().default("claude-haiku-4-5-20251001"),
 
   // Supabase
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+
+  // Telegram (optional — only needed for bot process)
+  TELEGRAM_BOT_TOKEN: z.string().optional().default(""),
+  TELEGRAM_ALLOWED_USERS: z.string().optional().default(""),
 })
 
 export type Env = z.infer<typeof envSchema>

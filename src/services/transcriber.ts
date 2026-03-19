@@ -1,8 +1,9 @@
 import { createReadStream } from "fs"
 import OpenAI from "openai"
+import { env } from "@/lib/env"
 
 function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return new OpenAI({ apiKey: env.OPENAI_API_KEY })
 }
 
 export type TranscriptionResult = {
@@ -29,7 +30,7 @@ function mapLanguage(whisperLanguage: string | undefined): DetectedLanguage {
 export async function transcribe(
   audioPath: string
 ): Promise<TranscriptionResult> {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "sk-your-openai-key") {
+  if (!env.OPENAI_API_KEY || env.OPENAI_API_KEY === "sk-your-openai-key") {
     console.warn("[Transcriber] OPENAI_API_KEY not set, skipping transcription")
     return { text: "", language: "none" }
   }

@@ -45,9 +45,13 @@ export interface UseReelsOptions {
 export function useReels(options: UseReelsOptions = {}) {
   const { tags, q, language, dateFrom, dateTo, status, collectionId, initialData } = options
 
+  // Only use SSR initialData when no filters are active — otherwise it would
+  // seed the filtered query with unfiltered results until the fetch completes
+  const hasFilters = Boolean(tags?.length || q || language || dateFrom || dateTo || status || collectionId)
+
   return useInfiniteQuery<ReelsResponse>({
     queryKey: ["reels", { tags, q, language, dateFrom, dateTo, status, collectionId }],
-    ...(initialData ? {
+    ...(initialData && !hasFilters ? {
       initialData: {
         pages: [initialData],
         pageParams: [1],
@@ -74,5 +78,14 @@ export function useReels(options: UseReelsOptions = {}) {
       return page < totalPages ? page + 1 : undefined
     },
     initialPageParam: 1,
+    // Poll every 5s while any reel is still processing so cards update when done
+    refetchInterval: (query) => {
+      const pages = query.state.data?.pages
+      if (!pages) return false
+      const hasProcessing = pages.some((page) =>
+        page.data.some((r) => r.status === "PENDING" || r.status === "PROCESSING"),
+      )
+      return hasProcessing ? 5000 : false
+    },
   })
 }
