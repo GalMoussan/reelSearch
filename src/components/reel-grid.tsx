@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useReels } from "@/hooks/use-reels"
 import { ReelCard } from "@/components/reel-card"
 import ReelCardSkeleton from "@/components/reel-card-skeleton"
@@ -35,6 +36,12 @@ interface ReelGridProps {
 }
 
 export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collectionId, onReelClick, onClearFilters, initialData }: ReelGridProps) {
+  const queryClient = useQueryClient()
+
+  function handleDelete() {
+    queryClient.invalidateQueries({ queryKey: ["reels"] })
+  }
+
   const {
     data,
     isLoading,
@@ -149,6 +156,7 @@ export function ReelGrid({ tags, q, language, dateFrom, dateTo, status, collecti
               reel={reel}
               onClick={handleReelClick}
               highlightTerms={highlightTerms}
+              onDelete={handleDelete}
             />
           ))}
         </div>

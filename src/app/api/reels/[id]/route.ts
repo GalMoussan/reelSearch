@@ -81,3 +81,40 @@ export async function GET(
     )
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    const reel = await prisma.reel.findUnique({
+      where: { id },
+      select: { addedById: true },
+    })
+
+    if (!reel) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (reel.addedById !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    await prisma.reel.delete({ where: { id } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error(`DELETE /api/reels/[id] error:`, error)
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    )
+  }
+}

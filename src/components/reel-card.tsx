@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react"
 import Image from "next/image"
-import { Film, Loader2, RotateCcw } from "lucide-react"
+import { Film, Loader2, RotateCcw, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
@@ -75,8 +75,9 @@ const STATUS_STYLES: Record<string, string> = {
 
 const MAX_VISIBLE_TAGS = 5
 
-export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) {
+export function ReelCard({ reel, onClick, highlightTerms = [], onDelete }: ReelCardProps & { onDelete?: (reelId: string) => void }) {
   const [isRetrying, setIsRetrying] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const visibleTags = reel.tags.slice(0, MAX_VISIBLE_TAGS)
   const remainingCount = reel.tags.length - MAX_VISIBLE_TAGS
   const showStatusBadge = reel.status !== "DONE"
@@ -91,6 +92,23 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()
       onClick?.(reel.id)
+    }
+  }
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation()
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/reels/${reel.id}`, { method: "DELETE" })
+      if (res.ok) {
+        onDelete?.(reel.id)
+      } else {
+        console.error("Delete failed:", await res.text())
+      }
+    } catch (err) {
+      console.error("Delete error:", err)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -155,7 +173,7 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
       </div>
 
       <CardContent className="p-4">
-        {/* Failed state: retry button + error message */}
+        {/* Failed state: retry + delete buttons */}
         {isFailed && (
           <div className="mb-2 flex items-center justify-between gap-2">
             <span
@@ -164,15 +182,42 @@ export function ReelCard({ reel, onClick, highlightTerms = [] }: ReelCardProps) 
             >
               {reel.errorMessage ?? "Processing failed"}
             </span>
+            <div className="flex shrink-0 gap-1">
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={handleRetry}
+                disabled={isRetrying || isDeleting}
+              >
+                <RotateCcw className={cn("mr-1 h-3 w-3", isRetrying && "animate-spin")} />
+                {isRetrying ? "Retrying..." : "Retry"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={handleDelete}
+                disabled={isDeleting || isRetrying}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Pending state: delete button */}
+        {isProcessing && onDelete && (
+          <div className="mb-2 flex justify-end">
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
-              className="h-6 shrink-0 px-2 text-xs"
-              onClick={handleRetry}
-              disabled={isRetrying}
+              className="h-6 px-2 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={handleDelete}
+              disabled={isDeleting}
             >
-              <RotateCcw className={cn("mr-1 h-3 w-3", isRetrying && "animate-spin")} />
-              {isRetrying ? "Retrying..." : "Retry"}
+              <Trash2 className={cn("mr-1 h-3 w-3", isDeleting && "animate-spin")} />
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </div>
         )}
