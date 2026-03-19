@@ -1,5 +1,7 @@
 import { getServerSession } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
+
+export const dynamic = "force-dynamic"
 import HomePage from "./home-page"
 
 export default async function Page() {

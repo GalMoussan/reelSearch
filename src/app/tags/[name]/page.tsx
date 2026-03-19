@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
+
+export const dynamic = "force-dynamic"
 import { TagReels } from "./tag-reels"
 
 export async function generateMetadata({
