@@ -7,7 +7,7 @@ import { uploadFile } from "@/lib/supabase"
 
 export type DownloadResult = {
   videoPath: string
-  audioPath: string
+  audioPath: string | null
   thumbnailUrl: string
 }
 
@@ -30,6 +30,7 @@ export async function downloadReel(
     return { videoPath, audioPath, thumbnailUrl: "" }
   }
 
+
   // Single yt-dlp call: download video + thumbnail together
   // Use bestvideo+bestaudio with mp4 merge for sites that only offer DASH/HLS (Reddit, X)
   await execText("yt-dlp", [
@@ -41,15 +42,30 @@ export async function downloadReel(
     url,
   ])
 
-  // Extract audio locally with ffmpeg (much faster than re-downloading)
-  await execText("ffmpeg", [
-    "-i", videoPath,
-    "-vn",
-    "-acodec", "libmp3lame",
-    "-q:a", "4",
-    "-y",
-    audioPath,
-  ], 30_000)
+  // Check if the video has an audio stream before extracting
+  let resolvedAudioPath: string | null = null
+  const probeOutput = await execText("ffprobe", [
+    "-v", "error",
+    "-select_streams", "a",
+    "-show_entries", "stream=codec_type",
+    "-of", "csv=p=0",
+    videoPath,
+  ]).catch(() => "")
+
+  if (probeOutput.trim()) {
+    // Video has audio — extract it
+    await execText("ffmpeg", [
+      "-i", videoPath,
+      "-vn",
+      "-acodec", "libmp3lame",
+      "-q:a", "4",
+      "-y",
+      audioPath,
+    ], 30_000)
+    resolvedAudioPath = audioPath
+  } else {
+    console.log(`[Downloader] No audio stream found for ${reelId}, skipping audio extraction`)
+  }
 
   // Find the thumbnail file (yt-dlp writes it next to the video)
   const files = await readdir(tempDir)
@@ -84,5 +100,5 @@ export async function downloadReel(
     console.warn(`[Downloader] No thumbnail found for ${reelId}, continuing without`)
   }
 
-  return { videoPath, audioPath, thumbnailUrl }
+  return { videoPath, audioPath: resolvedAudioPath, thumbnailUrl }
 }

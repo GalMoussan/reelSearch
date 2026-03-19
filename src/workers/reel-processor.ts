@@ -48,7 +48,7 @@ async function processReel(job: Job<ReelJobData>) {
     // 3. Transcribe audio and extract frames IN PARALLEL
     await setStep(reelId, "transcribing")
     const [transcription, frames] = await Promise.all([
-      transcribe(audioPath),
+      audioPath ? transcribe(audioPath) : Promise.resolve({ text: "", language: "none" as const }),
       extractFrames(videoPath),
     ])
     await job.updateProgress(50)
