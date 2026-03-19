@@ -1,5 +1,5 @@
 import { existsSync } from "fs"
-import { mkdir, readFile, readdir } from "fs/promises"
+import { mkdir, readFile, readdir, writeFile } from "fs/promises"
 import path from "path"
 import { execText } from "@/lib/exec"
 import { prisma } from "@/lib/prisma"
@@ -31,6 +31,16 @@ export async function downloadReel(
   }
 
 
+  // Write cookies file if env var is set (needed for Instagram on server IPs)
+  const cookiesArgs: string[] = []
+  const cookiesB64 = process.env.INSTAGRAM_COOKIES_B64
+  if (cookiesB64) {
+    const cookiesPath = path.join(TEMP_BASE, "instagram-cookies.txt")
+    await writeFile(cookiesPath, Buffer.from(cookiesB64, "base64"))
+    cookiesArgs.push("--cookies", cookiesPath)
+    console.log(`[Downloader] Using Instagram cookies file`)
+  }
+
   // Single yt-dlp call: download video + thumbnail together
   // Use bestvideo+bestaudio with mp4 merge for sites that only offer DASH/HLS (Reddit, X)
   await execText("yt-dlp", [
@@ -39,6 +49,7 @@ export async function downloadReel(
     "--merge-output-format", "mp4",
     "--write-thumbnail",
     "--no-playlist",
+    ...cookiesArgs,
     url,
   ])
 
