@@ -19,7 +19,7 @@ export async function GET() {
     })
 
     const languages = results
-      .map((r) => r.language)
+      .map((r: (typeof results)[number]) => r.language)
       .filter((l): l is string => l !== null)
 
     const response = NextResponse.json({ data: languages })
