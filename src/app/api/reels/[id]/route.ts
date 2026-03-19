@@ -54,7 +54,7 @@ export async function GET(
           userId: session.user.id,
         },
       })
-      .catch((err) => console.error("Failed to record view:", err))
+      .catch((err: unknown) => console.error("Failed to record view:", err))
 
     // Fetch user's note
     const note = await prisma.reelNote.findUnique({
