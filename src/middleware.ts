@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
-const PUBLIC_ROUTES = ["/login"]
+const PUBLIC_ROUTES = ["/login", "/api/health"]
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
