@@ -57,7 +57,7 @@ export async function GET(
         createdAt: collection.createdAt,
         updatedAt: collection.updatedAt,
         reelCount: collection._count.reels,
-        reels: collection.reels.map((cr) => cr.reel),
+        reels: collection.reels.map((cr: (typeof collection.reels)[number]) => cr.reel),
       },
     })
   } catch (error) {
