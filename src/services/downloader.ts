@@ -1,5 +1,5 @@
 import { existsSync } from "fs"
-import { mkdir, readFile, readdir, writeFile } from "fs/promises"
+import { mkdir, readFile, readdir, rename, writeFile } from "fs/promises"
 import path from "path"
 import { execText } from "@/lib/exec"
 import { prisma } from "@/lib/prisma"
@@ -52,6 +52,20 @@ export async function downloadReel(
     ...cookiesArgs,
     url,
   ])
+
+  // yt-dlp sometimes saves with a different extension (e.g. video.mp4.mkv)
+  // Find the actual video file and rename it to video.mp4 if needed
+  if (!existsSync(videoPath)) {
+    const files = await readdir(tempDir)
+    const videoFile = files.find(
+      (f) => /\.(mp4|mkv|webm|mov|avi)$/i.test(f) && !f.endsWith(".mp3")
+    )
+    if (!videoFile) {
+      throw new Error(`yt-dlp did not produce a video file in ${tempDir}. Files: ${files.join(", ")}`)
+    }
+    await rename(path.join(tempDir, videoFile), videoPath)
+    console.log(`[Downloader] Renamed ${videoFile} to video.mp4`)
+  }
 
   // Check if the video has an audio stream before extracting
   let resolvedAudioPath: string | null = null
