@@ -4,7 +4,7 @@ const PLATFORM_REGEXES = [
   // Instagram
   /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:reel|p)\/[\w-]+\/?(?:\?.*)?$/,
   // Facebook
-  /^(?:https?:\/\/)?(?:www\.|m\.)?facebook\.com\/(?:reel\/\d+|watch\/?\?v=\d+|[\w.]+\/videos\/\d+)\/?(?:\?.*)?$/,
+  /^(?:https?:\/\/)?(?:www\.|m\.)?facebook\.com\/(?:reel\/\d+|watch\/?\?v=\d+|[\w.]+\/videos\/\d+|share\/v\/[\w-]+)\/?(?:\?.*)?$/,
   /^(?:https?:\/\/)?fb\.watch\/[\w-]+\/?(?:\?.*)?$/,
   // YouTube
   /^(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:watch\?v=|shorts\/)[\w-]+(?:[&?].*)?$/,
