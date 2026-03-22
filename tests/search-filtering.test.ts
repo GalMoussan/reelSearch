@@ -177,12 +177,12 @@ describe('Tag filtering', () => {
     mockFullTextSearch.mockResolvedValue([])
 
     // Wire mocks to simulate real filtering
-    mockFindMany.mockImplementation(async (args: any) => {
-      return simulatePrismaFilter(args) as any
-    })
-    mockCount.mockImplementation(async (args: any) => {
-      return simulatePrismaFilter(args).length as any
-    })
+    mockFindMany.mockImplementation(((args: any) => {
+      return Promise.resolve(simulatePrismaFilter(args))
+    }) as any)
+    mockCount.mockImplementation(((args: any) => {
+      return Promise.resolve(simulatePrismaFilter(args).length)
+    }) as any)
   })
 
   it('selecting a single tag returns only reels that have that tag', async () => {
@@ -266,12 +266,12 @@ describe('Text search filtering', () => {
     mockGetServerSession.mockResolvedValue({ user: { id: 'u1', name: 'Test' } })
 
     // Wire mocks to simulate real filtering
-    mockFindMany.mockImplementation(async (args: any) => {
-      return simulatePrismaFilter(args) as any
-    })
-    mockCount.mockImplementation(async (args: any) => {
-      return simulatePrismaFilter(args).length as any
-    })
+    mockFindMany.mockImplementation(((args: any) => {
+      return Promise.resolve(simulatePrismaFilter(args))
+    }) as any)
+    mockCount.mockImplementation(((args: any) => {
+      return Promise.resolve(simulatePrismaFilter(args).length)
+    }) as any)
   })
 
   it('searching a string returns reels matching by tag name', async () => {
@@ -297,7 +297,7 @@ describe('Text search filtering', () => {
     // First call: tag search (returns r1, r3 which have "cooking" tag)
     // Second call: main query (fetch reels by ranked IDs)
     mockFindMany
-      .mockImplementationOnce(async (args: any) => simulatePrismaFilter(args) as any)
+      .mockImplementationOnce(((args: any) => Promise.resolve(simulatePrismaFilter(args))) as any)
       .mockResolvedValueOnce([
         REELS.cookingHealthy,
         REELS.cookingPasta,
