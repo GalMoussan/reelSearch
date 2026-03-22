@@ -115,6 +115,9 @@ async function processReel(job: Job<ReelJobData>) {
 const worker = new Worker("reel-processing", processReel, {
   connection,
   concurrency: 2,
+  stalledInterval: 60_000,   // check for stalled jobs every 60s (default: 30s)
+  lockDuration: 120_000,     // job lock duration in ms
+  lockRenewTime: 60_000,     // renew lock every 60s
 })
 
 worker.on("completed", (job) => {
